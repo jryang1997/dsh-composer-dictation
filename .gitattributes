@@ -1,0 +1,8 @@
+# Keep the repository in LF regardless of the contributor's platform: these files are
+# plain JavaScript, Markdown and YAML, and DSH reads them on Windows, macOS and Linux.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
