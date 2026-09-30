@@ -1,0 +1,3 @@
+- insert:
+    - id: dsh-hold-to-talk
+      name: '@local/dsh-hold-to-talk'

@@ -1,0 +1,237 @@
+# dsh-hold-to-talk
+
+**English** · [中文](#中文)
+
+Long-press anywhere on the composer card in [DeepSeek Harness](https://github.com/deepseek-ai) to dictate.
+Release to transcribe and drop the text into the draft — nothing is sent automatically.
+
+```
+┌──────────────────────────────────────────────┐
+│  按住鼠标 语音输入文字            ← fades in  │   ← hover the input box
+│                                              │
+│  ⌄  ＋  权限  计划            [ model ] [ ➤ ] │
+└──────────────────────────────────────────────┘
+
+        hold ≈0.35 s  ↓
+
+┌──────────────────────────────────────────────┐
+│         ▁▃▅▇▅▃▁   正在聆听 · 松开完成         │   ← release to transcribe
+│                   Esc 取消 · 上滑取消         │
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## Requirements — read this first
+
+This plugin **does not ship a speech recogniser**. It reuses the one DeepSeek Harness already
+has, so both of these must hold before it can do anything:
+
+1. **The official voice-input bundle is enabled.**
+   It ships with DeepSeek Harness as `@deepseek-ai/dsh-experimental-voice-input-bundle`
+   (Plugins → *Voice input* / 语音输入). It is what mounts the `speech` remote that this
+   plugin calls. If you disable it, this plugin silently registers nothing and the composer
+   keeps its normal behaviour.
+
+2. **The recognition models are prepared.**
+   The official bundle transcribes **locally** with SenseVoice. On first use the Host
+   downloads the model files (≈ 240 MB) into `~/.dsh/speech-to-text/sensevoice/models`
+   (`model.int8.onnx`, `tokens.txt`, `silero_vad.onnx`).
+   Open the voice-input bundle page and run **Download and prepare** once; or simply click
+   the built-in microphone button once and follow the setup prompt.
+
+> The official bundle has no streaming support, so a transcript appears only after you
+> release. Audio is transient: it never becomes a session event or an attachment, and only
+> the text you later submit is recorded.
+
+## Install
+
+DSH plugins are installed from a package directory, so clone first:
+
+```bash
+git clone https://github.com/jryang1997/dsh-hold-to-talk.git
+```
+
+Then pick one route.
+
+**A. Through the agent (recommended, works in the Desktop app)**
+
+Ask the agent in any session:
+
+> Install the bundle at `<absolute path to the clone>` with `plugin_manager`
+> (`action: install_bundle`).
+
+It runs `install_bundle` for the current profile and reports `application: applied`
+when the change is live.
+
+**B. Through the CLI**
+
+```bash
+dsh plugin --profile <profile> add <absolute path to the clone>
+```
+
+> The Desktop application owns its `desktop` profile exclusively, so use route A there.
+
+**C. Verify**
+
+Reload the page (`Ctrl+R`), hover the message box and look for the hint in the lower-right
+corner. If it does not appear, open the browser console and check that the host half
+activated.
+
+## Usage
+
+| Gesture | Result |
+|---|---|
+| Hover the input box | The hint fades in over ~0.6 s |
+| Press and hold ≈0.35 s without moving | The whole card becomes a recording surface |
+| Release | Transcript is inserted at the caret — **not** sent |
+| Press `Esc` while recording or transcribing | Cancel |
+| Hold, then swipe up ≥72 px, then release | Cancel (the panel turns red first) |
+| A plain click, a drag, or selecting text | Nothing happens — the gesture never arms |
+
+If the draft changed while recognition was running, the transcript is **kept** in a small
+lower-right chip; click it to insert at the current caret.
+
+## Tuning
+
+Everything lives at the top of `client.js`; there is no build step, so edit and reload.
+
+| Constant | Default | Meaning |
+|---|---|---|
+| `HOLD_MS` | `350` | How long the press must stay still |
+| `ARM_TOLERANCE_PX` | `10` | Movement that disarms the gesture |
+| `CANCEL_DISTANCE_PX` | `72` | Upward travel that arms "release to cancel" |
+| `MIN_SECONDS` | `0.35` | Recordings shorter than this are dropped |
+| `NOTICE_MS` | `2800` | How long a one-line notice stays |
+
+## How it works
+
+| Concern | Mechanism |
+|---|---|
+| Where it renders | One entry in the `conversation.input.overlay` slot — a floating layer inside the composer card |
+| Gesture surface | `node.closest('[data-composer-card]')` from its own node, listening in the capture phase |
+| Never disturbing typing | The layer is `pointer-events: none`; nothing is `preventDefault`ed before the hold threshold |
+| Recording | `getUserMedia` + `MediaRecorder` → `OfflineAudioContext` resample to 16 kHz mono → 44-byte PCM16 WAV |
+| Recognition | `ctx.remote.speech.transcribe({ audioBase64 })`; provider and language come from the Host config |
+| Draft insertion | The slot's own `inputActions.captureInsertion()` / `insertText(text, span)`, guarded by `draftRev` |
+| Styling | Only `--dsw-alias-*` theme tokens, so light and dark both work |
+| Text | Registered through `ctx.locale` (`zh`, `en`) |
+
+## Uninstall
+
+```text
+plugin_manager → action: remove_bundle → target: @local/dsh-hold-to-talk
+```
+
+The plugin is installed as a link to the clone, so deleting the clone directory after
+removing the bundle is safe.
+
+## License
+
+[MIT](LICENSE)
+
+---
+---
+
+# 中文
+
+**按住鼠标说话** —— 在 DeepSeek Harness 的输入框里长按鼠标即可语音输入，松开后转写并插入草稿，
+**不会自动发送**。
+
+## 前置依赖（先读这一节）
+
+本插件**不自带语音识别引擎**，它复用 DeepSeek Harness 已有的那套。所以下面两条必须成立：
+
+1. **官方的语音输入 bundle 处于启用状态。**
+   它是随 DSH 一起发布的 `@deepseek-ai/dsh-experimental-voice-input-bundle`（设置 → 插件 →
+   「语音输入」/ Voice input）。本插件调用的 `speech` 远程命名空间正是由它挂载的。
+   一旦禁用它，本插件会静默不注册任何东西，输入框行为完全恢复原样。
+
+2. **识别模型已经准备好。**
+   官方 bundle 使用 SenseVoice **在本机**转写。首次使用需要下载模型文件（约 240 MB）到
+   `~/.dsh/speech-to-text/sensevoice/models`（`model.int8.onnx`、`tokens.txt`、`silero_vad.onnx`）。
+   打开语音输入 bundle 的详情页点一次「下载并准备」，或者直接点一次内置麦克风按钮并按引导操作。
+
+> 官方 bundle 不支持流式转写，所以文字只会在你松开之后出现。音频是临时的：不会成为 Session
+> 事件或附件，只有你之后正式提交的文字才会被记录。
+
+## 安装
+
+DSH 插件从包目录安装，先克隆：
+
+```bash
+git clone https://github.com/jryang1997/dsh-hold-to-talk.git
+```
+
+然后二选一。
+
+**方式 A：让 Agent 装（推荐，桌面版用这个）**
+
+在任意会话里对 Agent 说：
+
+> 用 `plugin_manager`（`action: install_bundle`）安装 `<克隆下来的绝对路径>` 这个 bundle。
+
+它会为当前 profile 执行安装，并返回 `application: applied` 表示已生效。
+
+**方式 B：命令行**
+
+```bash
+dsh plugin --profile <profile> add <克隆下来的绝对路径>
+```
+
+> 桌面版应用独占它的 `desktop` profile，所以在桌面版里请用方式 A。
+
+**方式 C：验证**
+
+刷新页面（`Ctrl+R`），鼠标移到消息输入框上，右下角会出现提示行。
+如果没有出现，打开浏览器控制台确认 Host 半是否激活。
+
+## 使用
+
+| 手势 | 结果 |
+|---|---|
+| 鼠标移入输入框 | 提示行约 0.6 秒慢慢浮现 |
+| 按住不动约 0.35 秒 | 整张输入框变成录音面板 |
+| 松开 | 转写文字插入光标处，**不发送** |
+| 录音中或识别中按 `Esc` | 取消 |
+| 按住后上滑 ≥72 px 再松开 | 取消（面板会先变红提示） |
+| 单击、拖拽、拖选文字 | 什么都不发生 —— 手势根本不会激活 |
+
+如果识别期间草稿被改动过，转写结果会**保留**在右下角的小胶囊里，点一下即可插入到当前光标。
+
+## 调参
+
+全部在 `client.js` 顶部；没有构建步骤，改完刷新即可。
+
+| 常量 | 默认 | 含义 |
+|---|---|---|
+| `HOLD_MS` | `350` | 按住多久才算语音输入 |
+| `ARM_TOLERANCE_PX` | `10` | 超过这个位移就不激活 |
+| `CANCEL_DISTANCE_PX` | `72` | 上滑多少像素进入"松手取消" |
+| `MIN_SECONDS` | `0.35` | 短于此长度的录音直接丢弃 |
+| `NOTICE_MS` | `2800` | 一行提示停留多久 |
+
+## 实现原理
+
+| 环节 | 机制 |
+|---|---|
+| 渲染位置 | `conversation.input.overlay` 座位的一个条目 —— 输入框卡片内的浮层 |
+| 手势面 | 从自身节点 `closest('[data-composer-card]')` 拿到卡片，捕获阶段监听 |
+| 不干扰打字 | 浮层默认 `pointer-events: none`；达到长按阈值前不做任何 `preventDefault` |
+| 录音 | `getUserMedia` + `MediaRecorder` → `OfflineAudioContext` 重采样到 16 kHz 单声道 → 44 字节 PCM16 WAV |
+| 识别 | `ctx.remote.speech.transcribe({ audioBase64 })`，provider 与语言由 Host 配置决定 |
+| 写草稿 | 座位自带的 `inputActions.captureInsertion()` / `insertText(text, span)`，带 `draftRev` 校验 |
+| 样式 | 只用 `--dsw-alias-*` 主题令牌，明暗主题都正常 |
+| 文案 | 通过 `ctx.locale` 注册（`zh`、`en`） |
+
+## 卸载
+
+```text
+plugin_manager → action: remove_bundle → target: @local/dsh-hold-to-talk
+```
+
+插件是以链接方式安装的，卸载后删掉克隆目录即可。
+
+## 许可
+
+[MIT](LICENSE)

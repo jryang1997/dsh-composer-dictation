@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Hold to talk",
+    "description": "Long-press the composer card to record, then release to transcribe into the draft; the hint fades in on hover"
+  }
+}
