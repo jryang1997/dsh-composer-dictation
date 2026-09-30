@@ -1,7 +1,6 @@
 {
-  "name": "@local/dsh-hold-to-talk",
+  "name": "@jryang1997/dsh-composer-dictation",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "description": "Hold-to-talk dictation for the DeepSeek Harness composer: long-press the input box, release to transcribe into the draft",
   "license": "MIT",
@@ -18,7 +17,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jryang1997/dsh-hold-to-talk.git"
+    "url": "git+https://github.com/jryang1997/dsh-composer-dictation.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "exports": {
     ".": "./index.js",

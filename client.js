@@ -1,7 +1,7 @@
 /**
  * Hold-to-talk — long-press anywhere on the composer card to dictate.
  *
- * Client half of @local/dsh-hold-to-talk. It mounts one entry into
+ * Client half of @jryang1997/dsh-composer-dictation. It mounts one entry into
  * `conversation.input.overlay` (a list slot rendered inside the resident composer
  * card), walks up from its own node to `[data-composer-card]`, and watches pointer
  * events on that card in the capture phase.
@@ -16,14 +16,14 @@
  * `pointer-events: none` until a recording is actually running.
  */
 window.__ModuleLoader__.load({
-	id: '@local/dsh-hold-to-talk',
+	id: '@jryang1997/dsh-composer-dictation',
 	factory(require) {
 		const React = require('react');
 		const h = React.createElement;
 
-		const NS = 'dsh-hold-to-talk';
+		const NS = 'dsh-composer-dictation';
 		const SLOT = 'conversation.input.overlay';
-		const ENTRY = 'hold-to-talk';
+		const ENTRY = 'composer-dictation';
 
 		/** How long the pointer must stay still before the composer becomes a microphone. */
 		const HOLD_MS = 350;
@@ -433,7 +433,7 @@ window.__ModuleLoader__.load({
 				if (node === null) return undefined;
 				const card = node.closest('[data-composer-card]');
 				if (card === null) {
-					console.warn('dsh-hold-to-talk: [data-composer-card] not found; the composer layout changed');
+					console.warn('dsh-composer-dictation: [data-composer-card] not found; the composer layout changed');
 					return undefined;
 				}
 

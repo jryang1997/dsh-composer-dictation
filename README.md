@@ -1,4 +1,4 @@
-# dsh-hold-to-talk
+# dsh-composer-dictation
 
 **English** · [中文](#中文)
 
@@ -57,12 +57,12 @@ The plugin manager accepts a git URL as an install target, so the whole install 
 command. From the CLI:
 
 ```bash
-dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-talk
+dsh plugin --profile <profile> add github:jryang1997/dsh-composer-dictation
 ```
 
 or ask the agent in any session:
 
-> Install the bundle `github:jryang1997/dsh-hold-to-talk` with `plugin_manager`
+> Install the bundle `github:jryang1997/dsh-composer-dictation` with `plugin_manager`
 > (`action: install_bundle`).
 
 **B. Install from a clone**
@@ -71,7 +71,7 @@ Cloning first also works, and is the route to take when you want to modify the p
 locally:
 
 ```bash
-git clone https://github.com/jryang1997/dsh-hold-to-talk.git
+git clone https://github.com/jryang1997/dsh-composer-dictation.git
 ```
 
 Then install the directory: ask the agent to run `plugin_manager`
@@ -161,14 +161,17 @@ Community directories index that topic automatically — notably
 whose daily crawler collects repositories tagged `dsh-plugin`, so no submission is needed
 there either.
 
-`install_bundle` also accepts an npm package name, so if this plugin is ever published, a user
-could install it by name instead of via git. Publishing to npm would require renaming the
-package from `@local/...` to a scope the publisher owns.
+`install_bundle` also accepts an npm package name, so once this plugin is published to npm it
+can be installed by name instead of via git:
+
+```text
+plugin_manager → action: install_bundle → target: @jryang1997/dsh-composer-dictation
+```
 
 ## Uninstall
 
 ```text
-plugin_manager → action: remove_bundle → target: @local/dsh-hold-to-talk
+plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
 ```
 
 A directory install (route B) links to the clone, so deleting the clone after removing the
@@ -223,19 +226,19 @@ bundle is safe. A git install (route A) lives inside the profile and needs no cl
 插件管理器接受 git 地址作为安装目标，整条命令就能装完。命令行：
 
 ```bash
-dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-talk
+dsh plugin --profile <profile> add github:jryang1997/dsh-composer-dictation
 ```
 
 或在任意会话里对 Agent 说：
 
-> 用 `plugin_manager`（`action: install_bundle`）安装 `github:jryang1997/dsh-hold-to-talk` 这个 bundle。
+> 用 `plugin_manager`（`action: install_bundle`）安装 `github:jryang1997/dsh-composer-dictation` 这个 bundle。
 
 **方式 B：从克隆安装**
 
 先克隆再装目录也可以，想改本地代码时用这条路：
 
 ```bash
-git clone https://github.com/jryang1997/dsh-hold-to-talk.git
+git clone https://github.com/jryang1997/dsh-composer-dictation.git
 ```
 
 然后安装目录：让 Agent 执行 `plugin_manager`（`action: install_bundle`，`target` 填克隆目录的
@@ -315,13 +318,16 @@ DeepSeek Harness **没有官方插件市场，也没有投稿流程**：官方�
 [dsh-market](https://github.com/2BingLing/dsh-market)（[dsh.market](https://dsh.market)），
 它的每日爬虫会收集打了 `dsh-plugin` 的仓库，在那里同样无需投稿。
 
-`install_bundle` 也接受 npm 包名，所以如果将来发布到 npm，用户就能直接用包名安装、不必走 git。
-发布 npm 需要把包名从 `@local/...` 改成发布者自己拥有的 scope。
+`install_bundle` 也接受 npm 包名，所以发布到 npm 之后，用户可以直接用包名安装、不必走 git：
+
+```text
+plugin_manager → action: install_bundle → target: @jryang1997/dsh-composer-dictation
+```
 
 ## 卸载
 
 ```text
-plugin_manager → action: remove_bundle → target: @local/dsh-hold-to-talk
+plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
 ```
 
 方式 B（目录安装）是以链接方式装的，卸载后删掉克隆目录即可；方式 A（git 安装）装在
