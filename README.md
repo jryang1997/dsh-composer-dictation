@@ -165,6 +165,22 @@ there either.
 Installing from the git URL above is the supported route, needs no registry account, and is the
 one this repository is tested against.
 
+## Updating
+
+A git install is pinned to the commit it was installed from, so a new release needs one
+reinstall — there is no auto-update:
+
+```text
+plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
+plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation
+```
+
+Removing first matters: re-installing over an existing row can report `ambiguous-install`,
+because the dependency spec itself has not changed.
+
+Reload the page afterwards. The client half is a browser module, and it keeps the copy it
+already loaded until the page is refreshed.
+
 ## Uninstall
 
 ```text
@@ -320,6 +336,19 @@ DeepSeek Harness **没有官方插件市场，也没有投稿流程**：官方�
 ```text
 plugin_manager → action: install_bundle → target: @jryang1997/dsh-composer-dictation
 ```
+
+## 更新
+
+git 安装是钉在安装时那个提交上的，没有自动更新，出新版本要重装一次：
+
+```text
+plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
+plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation
+```
+
+**必须先 remove**：直接在原行上重装会报 `ambiguous-install`，因为依赖声明本身没有变化。
+
+装完记得刷新页面。客户端半是浏览器模块，不刷新会继续用已经加载的那份。
 
 ## 卸载
 
