@@ -153,6 +153,19 @@ plugin_manager → action: remove_bundle → target: @local/dsh-hold-to-talk
 The plugin is installed as a link to the clone, so deleting the clone directory after
 removing the bundle is safe.
 
+## Privacy and disclaimer
+
+- Audio is captured locally, handed to the Host's speech service over the local API, and
+  discarded. It never becomes a session event or an attachment.
+- **If the Host is configured with a cloud speech provider, that audio leaves the machine.**
+  This plugin sends no `providerId`, so whichever provider the Host has selected is used; the
+  default configuration transcribes locally with SenseVoice. Check *Settings → Plugins → Voice
+  input* before dictating anything sensitive.
+- The plugin makes no network request of its own and stores nothing.
+- Unofficial community plugin. Not affiliated with, endorsed by, or supported by DeepSeek;
+  "DeepSeek Harness" is named only to describe compatibility. The code here is original and
+  carries no code from the Harness packages.
+
 ## License
 
 [MIT](LICENSE)
@@ -275,6 +288,16 @@ plugin_manager → action: remove_bundle → target: @local/dsh-hold-to-talk
 ```
 
 插件是以链接方式安装的，卸载后删掉克隆目录即可。
+
+## 隐私与声明
+
+- 音频在本机采集，经本地 API 交给 Host 的语音服务，用完即弃；不会成为 Session 事件或附件。
+- **如果 Host 配置的是云端语音服务，音频会离开这台机器。** 本插件不指定 `providerId`，
+  用的是 Host 已选定的那个 provider —— 默认配置是本机 SenseVoice 本地转写。
+  在口述敏感内容前，请先确认「设置 → 插件 → 语音输入」里的选择。
+- 插件自身不发起任何网络请求，也不存储任何内容。
+- 非官方社区插件，与 DeepSeek 无隶属、背书或支持关系；提及「DeepSeek Harness」仅为说明兼容性。
+  本仓库代码为原创，不含 Harness 各包中的代码。
 
 ## 许可
 

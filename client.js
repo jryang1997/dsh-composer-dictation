@@ -52,15 +52,15 @@ window.__ModuleLoader__.load({
 			cancelReadyHint: '已上滑，松手即取消',
 			transcribing: '识别中…',
 			cancelled: '已取消',
-			empty: '没有识别到内容',
+			empty: '没有识别到内容，可以说长一点再试',
 			conflict: '草稿已改动，转写结果保留在右下角',
 			pending: '插入转写',
 			pendingHint: '点击插入到当前光标',
 			notReady: '语音模型还没准备好：请到「设置 → 插件 → 语音输入」点一次「下载并准备」',
-			failed: '语音识别失败：{message}',
+			failed: '转写失败：{message}',
 			unavailable: '当前环境无法录音',
 			permission: '麦克风不可用，请在系统设置中允许后重试',
-			tooLarge: '录音超出服务上限，请说短一点',
+			tooLarge: '录音超出语音服务上限，请说短一点',
 		};
 		const en = {
 			hint: 'Hold the mouse to dictate',
@@ -71,15 +71,15 @@ window.__ModuleLoader__.load({
 			cancelReadyHint: 'swiped up — releasing now discards the recording',
 			transcribing: 'Transcribing…',
 			cancelled: 'Cancelled',
-			empty: 'No speech recognized',
+			empty: 'Nothing was recognized — try speaking a little longer',
 			conflict: 'Draft changed; the transcript is kept at the lower right',
 			pending: 'Insert transcript',
 			pendingHint: 'Click to insert at the current caret',
 			notReady: 'The speech models are not prepared yet: open Settings → Plugins → Voice input and run "Download and prepare" once',
-			failed: 'Speech recognition failed: {message}',
+			failed: 'Could not transcribe the recording: {message}',
 			unavailable: 'This environment cannot record audio',
 			permission: 'Microphone unavailable; allow access in system settings and retry',
-			tooLarge: 'The recording exceeds the service limit',
+			tooLarge: 'That recording is longer than the speech service accepts',
 		};
 
 		/**
