@@ -30,7 +30,7 @@ window.__ModuleLoader__.load({
 		/** Movement beyond this disarms the gesture: it was a click, a caret move or a selection. */
 		const ARM_TOLERANCE_PX = 10;
 		/** Upward travel that arms the "release to cancel" state. */
-		const CANCEL_DISTANCE_PX = 72;
+		const CANCEL_DISTANCE_PX = 48;
 		/** Recordings shorter than this are dropped instead of transcribed. */
 		const MIN_SECONDS = 0.35;
 		/** Kept below the Host default (120 s) so the Host never rejects on duration. */
@@ -47,9 +47,9 @@ window.__ModuleLoader__.load({
 			hint: '按住鼠标 语音输入文字',
 			listening: '正在聆听',
 			release: '松开完成',
-			cancelHint: 'Esc 取消 · 上滑取消',
+			cancelHint: 'Esc 取消 · 上滑或移出输入框取消',
 			cancelReady: '松开取消',
-			cancelReadyHint: '已上滑，松手即取消',
+			cancelReadyHint: '松手即丢弃，移回输入框可继续',
 			transcribing: '识别中…',
 			cancelled: '已取消',
 			empty: '没有识别到内容，可以说长一点再试',
@@ -66,9 +66,9 @@ window.__ModuleLoader__.load({
 			hint: 'Hold the mouse to dictate',
 			listening: 'Listening',
 			release: 'release to finish',
-			cancelHint: 'Esc or swipe up to cancel',
+			cancelHint: 'Esc, or swipe up / leave the box to cancel',
 			cancelReady: 'Release to discard',
-			cancelReadyHint: 'swiped up — releasing now discards the recording',
+			cancelReadyHint: 'releasing now discards it — move back to keep it',
 			transcribing: 'Transcribing…',
 			cancelled: 'Cancelled',
 			empty: 'Nothing was recognized — try speaking a little longer',
@@ -505,6 +505,18 @@ window.__ModuleLoader__.load({
 					window.removeEventListener('pointercancel', onCancel, true);
 				};
 
+				/**
+				 * Arm or disarm "release to discard". Leaving the card counts as arming too:
+				 * the card is short, so an upward drag reaches its edge before it reaches the
+				 * distance threshold, and a silent cancel there is exactly the wrong feedback.
+				 * The state is reversible, so bringing the pointer back keeps the recording.
+				 */
+				const setCancelArmed = (armed) => {
+					if (state.cancelled === armed) return;
+					state.cancelled = armed;
+					show({ cancelled: armed });
+				};
+
 				const cancel = (silent) => {
 					clearTimer();
 					clearLimit();
@@ -528,6 +540,10 @@ window.__ModuleLoader__.load({
 					const actions = latest.current.props.inputActions;
 					if (actions === undefined || actions === null) return;
 					const run = ++state.run;
+					// A hold that starts while a previous transcription is still in flight
+					// abandons that request: the run check discards its result anyway, and
+					// left running it would spend the provider call twice.
+					if (state.abort !== null) state.abort.abort();
 					state.active = true;
 					state.busy = true;
 					state.cancelled = false;
@@ -635,8 +651,11 @@ window.__ModuleLoader__.load({
 						}
 						show({ phase: 'idle', notice: '', cancelled: false });
 					} catch (error) {
+						// A stale run's failure must stay invisible: the current run owns `busy`,
+						// and clearing it here would break Esc for that run.
+						if (run !== state.run) return;
 						state.busy = false;
-						if (run === state.run) show({ phase: 'notice', notice: failure(error), cancelled: false });
+						show({ phase: 'notice', notice: failure(error), cancelled: false });
 					} finally {
 						capture.dispose();
 					}
@@ -674,10 +693,11 @@ window.__ModuleLoader__.load({
 
 				function onMove(event) {
 					if (state.active) {
-						if (!state.cancelled && state.y - event.clientY > CANCEL_DISTANCE_PX) {
-							state.cancelled = true;
-							show({ cancelled: true });
-						}
+						// Two ways to arm the discard: drag upward inside the card, or leave the
+						// card entirely. Both are reversible.
+						const upward = state.y - event.clientY;
+						const outside = event.target instanceof Node && !card.contains(event.target);
+						setCancelArmed(upward > CANCEL_DISTANCE_PX || outside);
 						return;
 					}
 					if (state.timer === 0) return;
@@ -710,12 +730,17 @@ window.__ModuleLoader__.load({
 					}
 				}
 
-				const onEnter = () => latest.current.setHovered(true);
+				const onEnter = () => {
+					latest.current.setHovered(true);
+					// Coming back on the card forgives a cancel that was only armed.
+					if (state.active) setCancelArmed(false);
+				};
 				const onLeave = () => {
 					latest.current.setHovered(false);
-					// Only an armed press or a running capture is abandoned here; a finished
-					// recording that is merely transcribing must be allowed to land.
-					if (state.active) cancel(true);
+					// Arm rather than cancel: the user gets the red panel and can still come
+					// back. A finished recording that is merely transcribing must also be
+					// allowed to land, which is why this only fires while a capture runs.
+					if (state.active) setCancelArmed(true);
 				};
 
 				const onKeyDown = (event) => {

@@ -8,6 +8,7 @@
   "icon": "./icon.svg",
   "keywords": [
     "dsh",
+    "dsh-plugin",
     "deepseek-harness",
     "plugin",
     "bundle",

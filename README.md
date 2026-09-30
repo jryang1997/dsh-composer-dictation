@@ -2,7 +2,7 @@
 
 **English** · [中文](#中文)
 
-Long-press anywhere on the composer card in [DeepSeek Harness](https://github.com/deepseek-ai) to dictate.
+Long-press anywhere on the composer card in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) to dictate.
 Release to transcribe and drop the text into the draft — nothing is sent automatically.
 
 ```
@@ -51,33 +51,40 @@ missing.
 
 ## Install
 
-DSH plugins are installed from a package directory, so clone first:
+**A. Install straight from GitHub — no clone needed**
+
+The plugin manager accepts a git URL as an install target, so the whole install is one
+command. From the CLI:
+
+```bash
+dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-talk
+```
+
+or ask the agent in any session:
+
+> Install the bundle `github:jryang1997/dsh-hold-to-talk` with `plugin_manager`
+> (`action: install_bundle`).
+
+**B. Install from a clone**
+
+Cloning first also works, and is the route to take when you want to modify the plugin
+locally:
 
 ```bash
 git clone https://github.com/jryang1997/dsh-hold-to-talk.git
 ```
 
-Then pick one route.
-
-**A. Through the agent (recommended, works in the Desktop app)**
-
-Ask the agent in any session:
-
-> Install the bundle at `<absolute path to the clone>` with `plugin_manager`
-> (`action: install_bundle`).
-
-It runs `install_bundle` for the current profile and reports `application: applied`
-when the change is live.
-
-**B. Through the CLI**
+Then install the directory: ask the agent to run `plugin_manager`
+(`action: install_bundle`) with the clone's absolute path as `target`, or run
 
 ```bash
 dsh plugin --profile <profile> add <absolute path to the clone>
 ```
 
-> The Desktop application owns its `desktop` profile exclusively, so use route A there.
+> The Desktop application owns its `desktop` profile exclusively, so there ask the agent
+> rather than using the CLI.
 
-**C. Verify**
+**Verify**
 
 Reload the page (`Ctrl+R`), hover the message box and look for the hint in the lower-right
 corner. If it does not appear, open the browser console and check that the host half
@@ -91,7 +98,7 @@ activated.
 | Press and hold ≈0.35 s without moving | The whole card becomes a recording surface |
 | Release | Transcript is inserted at the caret — **not** sent |
 | Press `Esc` while recording or transcribing | Cancel |
-| Hold, then swipe up ≥72 px, then release | Cancel (the panel turns red first) |
+| Hold, then swipe up ≥48 px **or move the pointer off the box**, then release | Cancel — the panel turns red first, and moving back keeps the recording |
 | A plain click, a drag, or selecting text | Nothing happens — the gesture never arms |
 
 If the draft changed while recognition was running, the transcript is **kept** in a small
@@ -105,7 +112,7 @@ Everything lives at the top of `client.js`; there is no build step, so edit and 
 |---|---|---|
 | `HOLD_MS` | `350` | How long the press must stay still |
 | `ARM_TOLERANCE_PX` | `10` | Movement that disarms the gesture |
-| `CANCEL_DISTANCE_PX` | `72` | Upward travel that arms "release to cancel" |
+| `CANCEL_DISTANCE_PX` | `48` | Upward travel that arms "release to cancel" (leaving the box arms it too) |
 | `MIN_SECONDS` | `0.35` | Recordings shorter than this are dropped |
 | `NOTICE_MS` | `2800` | How long a one-line notice stays |
 
@@ -122,6 +129,9 @@ Everything lives at the top of `client.js`; there is no build step, so edit and 
 | Styling | Only `--dsw-alias-*` theme tokens, so light and dark both work |
 | Text | Registered through `ctx.locale` (`zh`, `en`) |
 
+Interface-by-interface notes, verified against the shipped packages, live in
+[docs/design.md](docs/design.md).
+
 ## Known limitations
 
 - **Pointer-only.** The long press is the only entry point; there is no keyboard equivalent
@@ -132,16 +142,27 @@ Everything lives at the top of `client.js`; there is no build step, so edit and 
 - It leans on two internal DSH interfaces — the `conversation.input.overlay` slot and the
   `speech` remote — which can change between Harness releases.
 
+## Development
+
+No dependencies and no build step. `npm run check` parses both halves, validates the bundle
+manifest, and checks the locale dictionaries for key and placeholder parity (the same checks
+run in CI).
+
 ## Distribution and discovery
 
-DeepSeek Harness has **no plugin marketplace and no submission process**: the official
-repository states that it cannot accept external pull requests at the moment, and the
-mechanism it points third-party plugins at is the GitHub topic
-[`dsh-plugin`](https://github.com/topics/dsh-plugin). This repository carries that topic, which
-is how it is meant to be found.
+DeepSeek Harness has **no official plugin marketplace and no submission process**: the
+official repository states that it cannot accept external pull requests at the moment, and
+the mechanism it points third-party plugins at is the GitHub topic
+[`dsh-plugin`](https://github.com/topics/dsh-plugin). This repository carries that topic,
+which is how it is meant to be found.
+
+Community directories index that topic automatically — notably
+[dsh-market](https://github.com/2BingLing/dsh-market) ([dsh.market](https://dsh.market)),
+whose daily crawler collects repositories tagged `dsh-plugin`, so no submission is needed
+there either.
 
 `install_bundle` also accepts an npm package name, so if this plugin is ever published, a user
-could install it by name instead of cloning. Publishing to npm would require renaming the
+could install it by name instead of via git. Publishing to npm would require renaming the
 package from `@local/...` to a scope the publisher owns.
 
 ## Uninstall
@@ -150,8 +171,8 @@ package from `@local/...` to a scope the publisher owns.
 plugin_manager → action: remove_bundle → target: @local/dsh-hold-to-talk
 ```
 
-The plugin is installed as a link to the clone, so deleting the clone directory after
-removing the bundle is safe.
+A directory install (route B) links to the clone, so deleting the clone after removing the
+bundle is safe. A git install (route A) lives inside the profile and needs no cleanup.
 
 ## Privacy and disclaimer
 
@@ -175,7 +196,7 @@ removing the bundle is safe.
 
 # 中文
 
-**按住鼠标说话** —— 在 DeepSeek Harness 的输入框里长按鼠标即可语音输入，松开后转写并插入草稿，
+**按住鼠标说话** —— 在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的输入框里长按鼠标即可语音输入，松开后转写并插入草稿，
 **不会自动发送**。
 
 ## 前置依赖（先读这一节）
@@ -197,31 +218,36 @@ removing the bundle is safe.
 
 ## 安装
 
-DSH 插件从包目录安装，先克隆：
+**方式 A：直接从 GitHub 安装，无需克隆**
+
+插件管理器接受 git 地址作为安装目标，整条命令就能装完。命令行：
+
+```bash
+dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-talk
+```
+
+或在任意会话里对 Agent 说：
+
+> 用 `plugin_manager`（`action: install_bundle`）安装 `github:jryang1997/dsh-hold-to-talk` 这个 bundle。
+
+**方式 B：从克隆安装**
+
+先克隆再装目录也可以，想改本地代码时用这条路：
 
 ```bash
 git clone https://github.com/jryang1997/dsh-hold-to-talk.git
 ```
 
-然后二选一。
-
-**方式 A：让 Agent 装（推荐，桌面版用这个）**
-
-在任意会话里对 Agent 说：
-
-> 用 `plugin_manager`（`action: install_bundle`）安装 `<克隆下来的绝对路径>` 这个 bundle。
-
-它会为当前 profile 执行安装，并返回 `application: applied` 表示已生效。
-
-**方式 B：命令行**
+然后安装目录：让 Agent 执行 `plugin_manager`（`action: install_bundle`，`target` 填克隆目录的
+绝对路径），或运行：
 
 ```bash
 dsh plugin --profile <profile> add <克隆下来的绝对路径>
 ```
 
-> 桌面版应用独占它的 `desktop` profile，所以在桌面版里请用方式 A。
+> 桌面版应用独占它的 `desktop` profile，所以在桌面版里请对 Agent 说，而不是用命令行。
 
-**方式 C：验证**
+**验证**
 
 刷新页面（`Ctrl+R`），鼠标移到消息输入框上，右下角会出现提示行。
 如果没有出现，打开浏览器控制台确认 Host 半是否激活。
@@ -234,7 +260,7 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 | 按住不动约 0.35 秒 | 整张输入框变成录音面板 |
 | 松开 | 转写文字插入光标处，**不发送** |
 | 录音中或识别中按 `Esc` | 取消 |
-| 按住后上滑 ≥72 px 再松开 | 取消（面板会先变红提示） |
+| 按住后上滑 ≥48 px，**或把鼠标移出输入框**，再松开 | 取消 —— 面板会先变红，移回输入框可继续录音 |
 | 单击、拖拽、拖选文字 | 什么都不发生 —— 手势根本不会激活 |
 
 如果识别期间草稿被改动过，转写结果会**保留**在右下角的小胶囊里，点一下即可插入到当前光标。
@@ -247,7 +273,7 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 |---|---|---|
 | `HOLD_MS` | `350` | 按住多久才算语音输入 |
 | `ARM_TOLERANCE_PX` | `10` | 超过这个位移就不激活 |
-| `CANCEL_DISTANCE_PX` | `72` | 上滑多少像素进入"松手取消" |
+| `CANCEL_DISTANCE_PX` | `48` | 上滑多少像素进入「松手取消」（移出输入框同样会进入） |
 | `MIN_SECONDS` | `0.35` | 短于此长度的录音直接丢弃 |
 | `NOTICE_MS` | `2800` | 一行提示停留多久 |
 
@@ -264,6 +290,8 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 | 样式 | 只用 `--dsw-alias-*` 主题令牌，明暗主题都正常 |
 | 文案 | 通过 `ctx.locale` 注册（`zh`、`en`） |
 
+逐接口的源码笔记（对照发行包核实过）在 [docs/design.md](docs/design.md)。
+
 ## 已知限制
 
 - **只能用指针。** 长按是唯一入口，目前没有键盘等价操作，纯键盘用户无法触达。加一个可聚焦的
@@ -272,13 +300,22 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 - 依赖 DSH 的两个内部接口 —— `conversation.input.overlay` 座位与 `speech` 远程命名空间 ——
   它们可能随 Harness 版本变化。
 
+## 开发
+
+零依赖、无构建步骤。`npm run check` 会解析两个半边、校验 bundle manifest，并检查两份文案的
+键与占位符是否一致（CI 里跑的就是这几项）。
+
 ## 分发与发现
 
-DeepSeek Harness **没有插件市场，也没有投稿流程**：官方仓库明确表示目前不接受外部 PR，
+DeepSeek Harness **没有官方插件市场，也没有投稿流程**：官方仓库明确表示目前不接受外部 PR，
 它为第三方插件指出的发现机制是 GitHub topic
 [`dsh-plugin`](https://github.com/topics/dsh-plugin)。本仓库打上了这个 topic，这就是它被找到的方式。
 
-`install_bundle` 也接受 npm 包名，所以如果将来发布到 npm，用户就能直接用包名安装、不必克隆。
+社区目录会自动索引这个 topic —— 比如
+[dsh-market](https://github.com/2BingLing/dsh-market)（[dsh.market](https://dsh.market)），
+它的每日爬虫会收集打了 `dsh-plugin` 的仓库，在那里同样无需投稿。
+
+`install_bundle` 也接受 npm 包名，所以如果将来发布到 npm，用户就能直接用包名安装、不必走 git。
 发布 npm 需要把包名从 `@local/...` 改成发布者自己拥有的 scope。
 
 ## 卸载
@@ -287,7 +324,8 @@ DeepSeek Harness **没有插件市场，也没有投稿流程**：官方仓库�
 plugin_manager → action: remove_bundle → target: @local/dsh-hold-to-talk
 ```
 
-插件是以链接方式安装的，卸载后删掉克隆目录即可。
+方式 B（目录安装）是以链接方式装的，卸载后删掉克隆目录即可；方式 A（git 安装）装在
+profile 内部，无需清理。
 
 ## 隐私与声明
 
