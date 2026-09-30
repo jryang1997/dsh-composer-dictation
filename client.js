@@ -37,8 +37,9 @@ window.__ModuleLoader__.load({
 		const MAX_SECONDS = 110;
 		/** Kept below the Host default (4 MiB) so the Host never rejects on size. */
 		const MAX_BYTES = 4 * 1024 * 1024 - 4096;
-		/** How long a one-line notice stays on screen. */
+		/** How long a one-line notice stays on screen, and how long its exit animation runs. */
 		const NOTICE_MS = 2800;
+		const NOTICE_EXIT_MS = 260;
 
 		/** Handles captured in `apply`, so a slot entry that receives no injected props still works. */
 		const runtime = { speech: null, limits: null };
@@ -277,8 +278,15 @@ window.__ModuleLoader__.load({
 		const EASE = 'cubic-bezier(.22,.61,.36,1)';
 
 		const KEYFRAMES = [
-			'@keyframes dsh-htt-panel-in{from{opacity:0;transform:scale(.99)}to{opacity:1;transform:none}}',
-			'@media (prefers-reduced-motion:reduce){.dsh-htt-hint,.dsh-htt-bar,.dsh-htt-pending{transition:none!important}.dsh-htt-panel{animation:none!important}}',
+			'@keyframes dsh-htt-panel-in{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}',
+			// A label swap replays this, so the text never blinks from one state to the next.
+			'@keyframes dsh-htt-swap{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}',
+			'@keyframes dsh-htt-notice-in{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}',
+			'@keyframes dsh-htt-notice-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(4px) scale(.98)}}',
+			// A ring that drifts outward while releasing would discard the recording.
+			'@keyframes dsh-htt-ping{0%{opacity:.5;transform:scale(1)}70%{opacity:0;transform:scale(1.02)}100%{opacity:0;transform:scale(1.02)}}',
+			'@keyframes dsh-htt-breathe{0%,100%{opacity:.7}50%{opacity:1}}',
+			'@media (prefers-reduced-motion:reduce){.dsh-htt-hint,.dsh-htt-bar,.dsh-htt-pending{transition:none!important}.dsh-htt-panel,.dsh-htt-ping,.dsh-htt-discard,.dsh-htt-notice,.dsh-htt-swap{animation:none!important}}',
 		].join('');
 
 		const layerStyle = (height) => ({
@@ -312,9 +320,13 @@ window.__ModuleLoader__.load({
 			...cornerStyle(rowHeight),
 			color: 'var(--dsw-alias-label-secondary)',
 			opacity: visible ? 0.72 : 0,
-			filter: visible ? 'blur(0px)' : 'blur(3px)',
-			transform: visible ? 'translateY(0)' : 'translateY(3px)',
-			transition: `opacity 620ms ${EASE}, filter 620ms ${EASE}, transform 620ms ${EASE}`,
+			filter: visible ? 'blur(0px)' : 'blur(4px)',
+			transform: visible ? 'translateY(0)' : 'translateY(2px)',
+			// Surfacing is slow enough to read as "arriving"; leaving is quicker and blurred, so
+			// the line dissolves instead of playing the entrance backwards.
+			transition: visible
+				? `opacity 620ms ${EASE}, filter 620ms ${EASE}, transform 620ms ${EASE}`
+				: `opacity 240ms ease-in, filter 240ms ease-in, transform 240ms ease-in`,
 		});
 
 		const pendingStyle = (rowHeight) => ({
@@ -371,13 +383,61 @@ window.__ModuleLoader__.load({
 			minWidth: 0,
 		};
 
-		const noticeStyle = (rowHeight) => ({
+		/** Cancelling is not a failure, so it reads as muted; only real errors turn red. */
+		const NOTICE_COLOR = {
+			muted: 'var(--dsw-alias-label-secondary)',
+			info: 'var(--dsw-alias-label-secondary)',
+			error: 'var(--dsw-alias-state-error-primary)',
+		};
+
+		const noticeStyle = (rowHeight, tone, leaving) => ({
 			...cornerStyle(rowHeight),
-			padding: '2px 9px',
-			borderRadius: '7px',
+			padding: '3px 10px',
+			border: `1px solid ${tone === 'error' ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-border-l1)'}`,
+			borderRadius: '8px',
 			background: 'var(--dsw-alias-bg-layer-2)',
-			color: 'var(--dsw-alias-label-secondary)',
+			color: NOTICE_COLOR[tone] ?? NOTICE_COLOR.info,
+			animation: leaving
+				? `dsh-htt-notice-out ${NOTICE_EXIT_MS}ms ease-in forwards`
+				: `dsh-htt-notice-in 200ms ${EASE}`,
 		});
+
+		/** The ring that drifts outward while a release would discard the recording. */
+		const pingStyle = {
+			position: 'absolute',
+			inset: 0,
+			borderRadius: '10px',
+			border: '1px solid var(--dsw-alias-state-error-primary)',
+			pointerEvents: 'none',
+			animation: 'dsh-htt-ping 1500ms ease-out infinite',
+		};
+
+		const discardStyle = {
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+			width: '26px',
+			height: '26px',
+			flex: '0 0 auto',
+			borderRadius: '50%',
+			border: '1px solid var(--dsw-alias-state-error-primary)',
+			color: 'var(--dsw-alias-state-error-primary)',
+			animation: 'dsh-htt-breathe 1400ms ease-in-out infinite',
+		};
+
+		const labelPrimaryStyle = {
+			fontSize: '13px',
+			lineHeight: '19px',
+			fontWeight: 500,
+			animation: `dsh-htt-swap 200ms ${EASE}`,
+		};
+
+		const labelSecondaryStyle = {
+			fontSize: '12px',
+			lineHeight: '17px',
+			opacity: 0.75,
+			animation: `dsh-htt-swap 240ms ${EASE}`,
+		};
 
 		/** Small microphone glyph, drawn inline so the plugin carries no assets. */
 		function MicGlyph({ size = 14 }) {
@@ -395,6 +455,71 @@ window.__ModuleLoader__.load({
 			);
 		}
 
+		/** Circle-and-cross, shown once releasing would discard the recording. */
+		function DiscardGlyph({ size = 13 }) {
+			return h(
+				'svg',
+				{ width: size, height: size, viewBox: '0 0 16 16', 'aria-hidden': true, style: { flex: '0 0 auto' } },
+				h('path', {
+					d: 'M4.4 4.4l7.2 7.2M11.6 4.4l-7.2 7.2',
+					stroke: 'currentColor',
+					strokeWidth: 1.6,
+					strokeLinecap: 'round',
+					fill: 'none',
+				}),
+			);
+		}
+
+		/** A small mark that tells the three notice tones apart at a glance. */
+		function NoticeGlyph({ tone }) {
+			const common = {
+				width: 13,
+				height: 13,
+				viewBox: '0 0 16 16',
+				'aria-hidden': true,
+				style: { flex: '0 0 auto' },
+			};
+			if (tone === 'error') {
+				return h(
+					'svg',
+					common,
+					h('path', {
+						d: 'M8 2.2 14.4 13.4H1.6Z',
+						fill: 'none',
+						stroke: 'currentColor',
+						strokeWidth: 1.4,
+						strokeLinejoin: 'round',
+					}),
+					h('path', {
+						d: 'M8 6.1v3.1M8 11.2v.1',
+						stroke: 'currentColor',
+						strokeWidth: 1.4,
+						strokeLinecap: 'round',
+					}),
+				);
+			}
+			if (tone === 'muted') {
+				return h(
+					'svg',
+					common,
+					h('circle', { cx: 8, cy: 8, r: 6.1, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4 }),
+					h('path', { d: 'M4.1 11.9 11.9 4.1', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' }),
+				);
+			}
+			return h(
+				'svg',
+				common,
+				h('path', {
+					d: 'M3.4 8.4 6.5 11.5 12.6 5.2',
+					fill: 'none',
+					stroke: 'currentColor',
+					strokeWidth: 1.6,
+					strokeLinecap: 'round',
+					strokeLinejoin: 'round',
+				}),
+			);
+		}
+
 		//#endregion
 
 		//#region component
@@ -406,7 +531,7 @@ window.__ModuleLoader__.load({
 			return (request, signal) => runtime.speech.transcribe(request, signal);
 		}
 
-		const IDLE = { phase: 'idle', notice: '', cancelled: false, pending: '' };
+		const IDLE = { phase: 'idle', notice: '', tone: 'info', leaving: false, cancelled: false, pending: '' };
 		const BAR_WEIGHTS = [0.45, 0.8, 1, 0.68, 0.5];
 
 		function HoldToTalk(props) {
@@ -417,16 +542,9 @@ window.__ModuleLoader__.load({
 			const [box, setBox] = React.useState({ height: 0, rowHeight: 0 });
 			const latest = React.useRef(null);
 			latest.current = { props, view, setHovered, setView };
-
-			/** One-line notices clear themselves, without dropping a retained transcript. */
-			React.useEffect(() => {
-				if (view.phase !== 'notice') return undefined;
-				const timer = window.setTimeout(
-					() => setView((current) => ({ ...current, phase: 'idle', notice: '' })),
-					NOTICE_MS,
-				);
-				return () => window.clearTimeout(timer);
-			}, [view]);
+			// Notices live and die on timers owned by the setup effect below, so that the exit
+			// animation can run before the element unmounts. A React effect cannot do this:
+			// its dependency on `view` would restart the countdown the moment it re-renders.
 
 			React.useEffect(() => {
 				const node = root.current;
@@ -457,6 +575,8 @@ window.__ModuleLoader__.load({
 				const state = {
 					timer: 0,
 					limit: 0,
+					noticeHold: 0,
+					noticeExit: 0,
 					run: 0,
 					active: false,
 					busy: false,
@@ -470,7 +590,37 @@ window.__ModuleLoader__.load({
 				};
 
 				const say = (key, params) => translate(latest.current.props, key, params);
-				const show = (patch) => latest.current.setView((current) => ({ ...current, ...patch }));
+
+				const clearNotice = () => {
+					if (state.noticeHold !== 0) {
+						window.clearTimeout(state.noticeHold);
+						state.noticeHold = 0;
+					}
+					if (state.noticeExit !== 0) {
+						window.clearTimeout(state.noticeExit);
+						state.noticeExit = 0;
+					}
+				};
+
+				/**
+				 * Publish a view patch. A notice gets a two-stage lifetime — it holds for
+				 * NOTICE_MS, animates out for NOTICE_EXIT_MS, and only then unmounts — so it
+				 * dissolves instead of vanishing. `leaving` is that second stage.
+				 */
+				const show = (patch) => {
+					if (patch.phase !== undefined && patch.phase !== 'notice') clearNotice();
+					latest.current.setView((current) => ({ ...current, leaving: false, ...patch }));
+					if (patch.phase !== 'notice') return;
+					clearNotice();
+					state.noticeHold = window.setTimeout(() => {
+						state.noticeHold = 0;
+						latest.current.setView((current) => ({ ...current, leaving: true }));
+						state.noticeExit = window.setTimeout(() => {
+							state.noticeExit = 0;
+							latest.current.setView((current) => ({ ...current, phase: 'idle', notice: '', leaving: false }));
+						}, NOTICE_EXIT_MS);
+					}, NOTICE_MS);
+				};
 
 				const failure = (error) => {
 					const name = error instanceof Error ? error.name : '';
@@ -533,7 +683,7 @@ window.__ModuleLoader__.load({
 					state.abort = null;
 					if (capture !== null) capture.dispose();
 					if (silent) show({ phase: 'idle', notice: '', cancelled: false });
-					else show({ phase: 'notice', notice: say('cancelled'), cancelled: false });
+					else show({ phase: 'notice', notice: say('cancelled'), tone: 'muted', cancelled: false });
 				};
 
 				async function begin() {
@@ -583,7 +733,7 @@ window.__ModuleLoader__.load({
 						state.starting = null;
 						state.active = false;
 						state.busy = false;
-						show({ phase: 'notice', notice: failure(error) });
+						show({ phase: 'notice', notice: failure(error), tone: 'error' });
 					}
 				}
 
@@ -619,13 +769,13 @@ window.__ModuleLoader__.load({
 						const limitBytes = Math.min(MAX_BYTES, runtime.limits?.maxAudioBytes ?? MAX_BYTES);
 						if (audio.buffer.byteLength > limitBytes) {
 							state.busy = false;
-							show({ phase: 'notice', notice: say('tooLarge'), cancelled: false });
+							show({ phase: 'notice', notice: say('tooLarge'), tone: 'error', cancelled: false });
 							return;
 						}
 						const transcribe = resolveTranscribe(latest.current.props);
 						if (typeof transcribe !== 'function') {
 							state.busy = false;
-							show({ phase: 'notice', notice: say('unavailable'), cancelled: false });
+							show({ phase: 'notice', notice: say('unavailable'), tone: 'error', cancelled: false });
 							return;
 						}
 						// No providerId/language: the Host resolves both from its own
@@ -635,12 +785,12 @@ window.__ModuleLoader__.load({
 						if (run !== state.run) return;
 						state.busy = false;
 						if (result === undefined || result.ok !== true) {
-							show({ phase: 'notice', notice: failureNotice(result?.error?.message ?? '') });
+							show({ phase: 'notice', notice: failureNotice(result?.error?.message ?? ''), tone: 'error' });
 							return;
 						}
 						const transcript = result.value?.text ?? '';
 						if (transcript === '') {
-							show({ phase: 'notice', notice: say('empty') });
+							show({ phase: 'notice', notice: say('empty'), tone: 'info' });
 							return;
 						}
 						const actions = latest.current.props.inputActions;
@@ -655,7 +805,7 @@ window.__ModuleLoader__.load({
 						// and clearing it here would break Esc for that run.
 						if (run !== state.run) return;
 						state.busy = false;
-						show({ phase: 'notice', notice: failure(error), cancelled: false });
+						show({ phase: 'notice', notice: failure(error), tone: 'error', cancelled: false });
 					} finally {
 						capture.dispose();
 					}
@@ -670,7 +820,7 @@ window.__ModuleLoader__.load({
 						show({ phase: 'idle', notice: '', pending: '' });
 						return;
 					}
-					show({ phase: 'notice', notice: say('conflict') });
+					show({ phase: 'notice', notice: say('conflict'), tone: 'info' });
 				};
 
 				function onPointerDown(event) {
@@ -778,6 +928,7 @@ window.__ModuleLoader__.load({
 					if (observer !== null) observer.disconnect();
 					clearTimer();
 					clearLimit();
+					clearNotice();
 					detach();
 					state.run += 1;
 					if (state.abort !== null) state.abort.abort();
@@ -825,27 +976,39 @@ window.__ModuleLoader__.load({
 					h(
 						'div',
 						{ className: 'dsh-htt-panel', style: panelStyle(cancelled), role: 'status', 'aria-live': 'polite' },
+						cancelled && h('span', { className: 'dsh-htt-ping', style: pingStyle, 'aria-hidden': true }),
 						recording &&
-							h(
-								'div',
-								{ ref: bars, className: 'dsh-htt-bars', style: barsStyle, 'aria-hidden': true },
-								BAR_WEIGHTS.map((weight, index) =>
-									h('span', {
-										key: index,
-										className: 'dsh-htt-bar',
-										style: {
-											...barStyle(cancelled),
-											height: `calc(4px + ${Math.round(weight * 22)}px * var(--dsh-htt-level, 0))`,
-										},
-									}),
-								),
-							),
+							(cancelled
+								? h(
+										'span',
+										{ className: 'dsh-htt-discard', style: discardStyle, 'aria-hidden': true },
+										h(DiscardGlyph, null),
+									)
+								: h(
+										'div',
+										{ ref: bars, className: 'dsh-htt-bars', style: barsStyle, 'aria-hidden': true },
+										BAR_WEIGHTS.map((weight, index) =>
+											h('span', {
+												key: index,
+												className: 'dsh-htt-bar',
+												style: {
+													...barStyle(false),
+													height: `calc(4px + ${Math.round(weight * 22)}px * var(--dsh-htt-level, 0))`,
+												},
+											}),
+										),
+									)),
 						h(
 							'span',
 							{ style: labelStyle },
+							// Re-keying replays the swap animation, so the text never blinks.
 							h(
 								'span',
-								{ style: { fontSize: '13px', lineHeight: '19px', fontWeight: 500 } },
+								{
+									key: recording ? (cancelled ? 'cancel' : 'listen') : 'transcribe',
+									className: 'dsh-htt-swap',
+									style: labelPrimaryStyle,
+								},
 								recording
 									? cancelled
 										? translate(props, 'cancelReady')
@@ -855,7 +1018,11 @@ window.__ModuleLoader__.load({
 							recording &&
 								h(
 									'span',
-									{ style: { fontSize: '12px', lineHeight: '17px', opacity: 0.75 } },
+									{
+										key: cancelled ? 'cancelHint' : 'recordingHint',
+										className: 'dsh-htt-swap',
+										style: labelSecondaryStyle,
+									},
 									cancelled ? translate(props, 'cancelReadyHint') : translate(props, 'cancelHint'),
 								),
 						),
@@ -863,8 +1030,13 @@ window.__ModuleLoader__.load({
 				view.phase === 'notice' &&
 					h(
 						'div',
-						{ className: 'dsh-htt-notice', style: noticeStyle(box.rowHeight), role: 'status' },
-						view.notice,
+						{
+							className: 'dsh-htt-notice',
+							style: noticeStyle(box.rowHeight, view.tone, view.leaving),
+							role: 'status',
+						},
+						h(NoticeGlyph, { tone: view.tone }),
+						h('span', null, view.notice),
 					),
 			);
 		}
