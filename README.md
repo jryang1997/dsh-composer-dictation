@@ -44,6 +44,11 @@ has, so both of these must hold before it can do anything:
 > release. Audio is transient: it never becomes a session event or an attachment, and only
 > the text you later submit is recorded.
 
+**Tested against** DeepSeek Harness `0.1.7-rc.2` (the version shipped with the desktop app at
+the time of writing). The plugin uses two internal interfaces — the `conversation.input.overlay`
+slot and the `speech` remote — and is written to degrade instead of throwing when either is
+missing.
+
 ## Install
 
 DSH plugins are installed from a package directory, so clone first:
@@ -116,6 +121,18 @@ Everything lives at the top of `client.js`; there is no build step, so edit and 
 | Draft insertion | The slot's own `inputActions.captureInsertion()` / `insertText(text, span)`, guarded by `draftRev` |
 | Styling | Only `--dsw-alias-*` theme tokens, so light and dark both work |
 | Text | Registered through `ctx.locale` (`zh`, `en`) |
+
+## Distribution and discovery
+
+DeepSeek Harness has **no plugin marketplace and no submission process**: the official
+repository states that it cannot accept external pull requests at the moment, and the
+mechanism it points third-party plugins at is the GitHub topic
+[`dsh-plugin`](https://github.com/topics/dsh-plugin). This repository carries that topic, which
+is how it is meant to be found.
+
+`install_bundle` also accepts an npm package name, so if this plugin is ever published, a user
+could install it by name instead of cloning. Publishing to npm would require renaming the
+package from `@local/...` to a scope the publisher owns.
 
 ## Uninstall
 
@@ -223,6 +240,15 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 | 写草稿 | 座位自带的 `inputActions.captureInsertion()` / `insertText(text, span)`，带 `draftRev` 校验 |
 | 样式 | 只用 `--dsw-alias-*` 主题令牌，明暗主题都正常 |
 | 文案 | 通过 `ctx.locale` 注册（`zh`、`en`） |
+
+## 分发与发现
+
+DeepSeek Harness **没有插件市场，也没有投稿流程**：官方仓库明确表示目前不接受外部 PR，
+它为第三方插件指出的发现机制是 GitHub topic
+[`dsh-plugin`](https://github.com/topics/dsh-plugin)。本仓库打上了这个 topic，这就是它被找到的方式。
+
+`install_bundle` 也接受 npm 包名，所以如果将来发布到 npm，用户就能直接用包名安装、不必克隆。
+发布 npm 需要把包名从 `@local/...` 改成发布者自己拥有的 scope。
 
 ## 卸载
 

@@ -36,6 +36,10 @@
     "README.md",
     "LICENSE"
   ],
+  "scripts": {
+    "test": "node tests/locales.test.mjs",
+    "check": "node --check index.js && node --check client.js && node tests/locales.test.mjs"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

@@ -56,6 +56,7 @@ window.__ModuleLoader__.load({
 			conflict: '草稿已改动，转写结果保留在右下角',
 			pending: '插入转写',
 			pendingHint: '点击插入到当前光标',
+			notReady: '语音模型还没准备好：请到「设置 → 插件 → 语音输入」点一次「下载并准备」',
 			failed: '语音识别失败：{message}',
 			unavailable: '当前环境无法录音',
 			permission: '麦克风不可用，请在系统设置中允许后重试',
@@ -74,14 +75,20 @@ window.__ModuleLoader__.load({
 			conflict: 'Draft changed; the transcript is kept at the lower right',
 			pending: 'Insert transcript',
 			pendingHint: 'Click to insert at the current caret',
+			notReady: 'The speech models are not prepared yet: open Settings → Plugins → Voice input and run "Download and prepare" once',
 			failed: 'Speech recognition failed: {message}',
 			unavailable: 'This environment cannot record audio',
 			permission: 'Microphone unavailable; allow access in system settings and retry',
 			tooLarge: 'The recording exceeds the service limit',
 		};
 
-		/** Dictionary used when a slot entry is handed no translator of its own. */
-		const fallbackDictionary = String(navigator.language ?? '').toLowerCase().startsWith('en') ? en : zh;
+		/**
+		 * Last-resort dictionary for the case where a slot entry is handed no translator at
+		 * all. DSH always resolves through `ctx.locale` first — its fallback chain ends at
+		 * English — so this should never be reached; it exists so that a registration change
+		 * can never leave raw keys on screen.
+		 */
+		const fallbackDictionary = String(navigator.language ?? '').toLowerCase().startsWith('zh') ? zh : en;
 
 		/**
 		 * Resolve a label through the slot's own translator, falling back to the local
@@ -447,7 +454,13 @@ window.__ModuleLoader__.load({
 					const name = error instanceof Error ? error.name : '';
 					if (name === 'NotAllowedError' || name === 'SecurityError') return say('permission');
 					if (name === 'NotFoundError' || name === 'NotReadableError') return say('unavailable');
-					return say('failed', { message: error instanceof Error ? error.message : String(error) });
+					return failureNotice(error instanceof Error ? error.message : String(error));
+				};
+
+				/** Turn a Host-side recognition error into a line the user can act on. */
+				const failureNotice = (message) => {
+					if (/prepare/i.test(message)) return say('notReady');
+					return say('failed', { message });
 				};
 
 				const clearTimer = () => {
@@ -566,7 +579,7 @@ window.__ModuleLoader__.load({
 						if (run !== state.run) return;
 						state.busy = false;
 						if (result === undefined || result.ok !== true) {
-							show({ phase: 'notice', notice: say('failed', { message: result?.error?.message ?? '' }) });
+							show({ phase: 'notice', notice: failureNotice(result?.error?.message ?? '') });
 							return;
 						}
 						const transcript = result.value?.text ?? '';
