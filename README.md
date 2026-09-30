@@ -122,6 +122,16 @@ Everything lives at the top of `client.js`; there is no build step, so edit and 
 | Styling | Only `--dsw-alias-*` theme tokens, so light and dark both work |
 | Text | Registered through `ctx.locale` (`zh`, `en`) |
 
+## Known limitations
+
+- **Pointer-only.** The long press is the only entry point; there is no keyboard equivalent
+  yet, so the feature is not reachable by keyboard alone. A focusable trigger is the obvious
+  next addition.
+- **Mouse-first.** Touch input is untested: on a touch screen a long press also drives text
+  selection, so the thresholds would probably need tuning there.
+- It leans on two internal DSH interfaces — the `conversation.input.overlay` slot and the
+  `speech` remote — which can change between Harness releases.
+
 ## Distribution and discovery
 
 DeepSeek Harness has **no plugin marketplace and no submission process**: the official
@@ -240,6 +250,14 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 | 写草稿 | 座位自带的 `inputActions.captureInsertion()` / `insertText(text, span)`，带 `draftRev` 校验 |
 | 样式 | 只用 `--dsw-alias-*` 主题令牌，明暗主题都正常 |
 | 文案 | 通过 `ctx.locale` 注册（`zh`、`en`） |
+
+## 已知限制
+
+- **只能用指针。** 长按是唯一入口，目前没有键盘等价操作，纯键盘用户无法触达。加一个可聚焦的
+  触发按钮是下一步最该做的事。
+- **以鼠标为主。** 触摸屏未验证：触摸长按同时会驱动文本选择，阈值大概需要另调。
+- 依赖 DSH 的两个内部接口 —— `conversation.input.overlay` 座位与 `speech` 远程命名空间 ——
+  它们可能随 Harness 版本变化。
 
 ## 分发与发现
 

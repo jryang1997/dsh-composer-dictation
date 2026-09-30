@@ -41,7 +41,7 @@ window.__ModuleLoader__.load({
 		const NOTICE_MS = 2800;
 
 		/** Handles captured in `apply`, so a slot entry that receives no injected props still works. */
-		const runtime = { speech: null };
+		const runtime = { speech: null, limits: null };
 
 		const zh = {
 			hint: '按住鼠标 语音输入文字',
@@ -174,6 +174,7 @@ window.__ModuleLoader__.load({
 			let recorder = null;
 			let context = null;
 			let analyser = null;
+			let failure = null;
 			let released = false;
 
 			const release = () => {
@@ -206,6 +207,7 @@ window.__ModuleLoader__.load({
 							noiseSuppression: true,
 							autoGainControl: true,
 						},
+						video: false,
 					});
 					if (released) {
 						for (const track of stream.getTracks()) track.stop();
@@ -218,6 +220,11 @@ window.__ModuleLoader__.load({
 					recorder = new MediaRecorder(stream);
 					recorder.addEventListener('dataavailable', (event) => {
 						if (event.data !== undefined && event.data.size > 0) chunks.push(event.data);
+					});
+					// A device lost mid-capture may never emit `stop`; record the reason and let
+					// `stop()` bail out instead of awaiting an event that will not arrive.
+					recorder.addEventListener('error', (event) => {
+						failure = event?.error instanceof Error ? event.error : new Error('recorder-failed');
 					});
 					recorder.start(200);
 				},
@@ -236,12 +243,26 @@ window.__ModuleLoader__.load({
 				async stop() {
 					if (recorder !== null && recorder.state !== 'inactive') {
 						await new Promise((resolve) => {
-							recorder.addEventListener('stop', () => resolve(), { once: true });
-							recorder.stop();
+							// Bounded: a wedged recorder must never hang the composer UI, and the
+							// microphone has to be released either way.
+							const timer = window.setTimeout(resolve, 4000);
+							const settle = () => {
+								window.clearTimeout(timer);
+								resolve();
+							};
+							recorder.addEventListener('stop', settle, { once: true });
+							recorder.addEventListener('error', settle, { once: true });
+							try {
+								recorder.stop();
+							} catch (error) {
+								settle();
+							}
 						});
 					}
 					const blob = new Blob(chunks, { type: chunks[0]?.type ?? 'audio/webm' });
+					const reason = failure;
 					release();
+					if (reason !== null) throw reason;
 					if (blob.size === 0) return { buffer: encodeWave(new Float32Array(0)), seconds: 0 };
 					return await toSixteenKilohertz(blob);
 				},
@@ -257,7 +278,7 @@ window.__ModuleLoader__.load({
 
 		const KEYFRAMES = [
 			'@keyframes dsh-htt-panel-in{from{opacity:0;transform:scale(.99)}to{opacity:1;transform:none}}',
-			'@media (prefers-reduced-motion:reduce){.dsh-htt-hint,.dsh-htt-bar,.dsh-htt-pending{transition:none!important}}',
+			'@media (prefers-reduced-motion:reduce){.dsh-htt-hint,.dsh-htt-bar,.dsh-htt-pending{transition:none!important}.dsh-htt-panel{animation:none!important}}',
 		].join('');
 
 		const layerStyle = (height) => ({
@@ -435,6 +456,7 @@ window.__ModuleLoader__.load({
 
 				const state = {
 					timer: 0,
+					limit: 0,
 					run: 0,
 					active: false,
 					busy: false,
@@ -470,6 +492,13 @@ window.__ModuleLoader__.load({
 					}
 				};
 
+				const clearLimit = () => {
+					if (state.limit !== 0) {
+						window.clearTimeout(state.limit);
+						state.limit = 0;
+					}
+				};
+
 				const detach = () => {
 					window.removeEventListener('pointermove', onMove, true);
 					window.removeEventListener('pointerup', onUp, true);
@@ -478,6 +507,7 @@ window.__ModuleLoader__.load({
 
 				const cancel = (silent) => {
 					clearTimer();
+					clearLimit();
 					detach();
 					const capture = state.capture;
 					state.capture = null;
@@ -506,6 +536,14 @@ window.__ModuleLoader__.load({
 					const capture = createCapture();
 					state.capture = capture;
 					show({ phase: 'recording', notice: '', cancelled: false });
+
+					// The Host caps recording length; stop on our own so a forgotten press cannot
+					// grow the chunk buffer without bound and then be rejected on arrival.
+					const limitSeconds = Math.min(MAX_SECONDS, runtime.limits?.maxDurationSeconds ?? MAX_SECONDS);
+					state.limit = window.setTimeout(() => {
+						state.limit = 0;
+						if (state.active) void finish();
+					}, limitSeconds * 1000);
 
 					const pump = () => {
 						if (state.capture !== capture) return;
@@ -544,6 +582,7 @@ window.__ModuleLoader__.load({
 					state.starting = null;
 					state.span = null;
 					clearTimer();
+					clearLimit();
 					detach();
 					if (capture === null || abort === null) {
 						state.busy = false;
@@ -561,7 +600,8 @@ window.__ModuleLoader__.load({
 							show({ phase: 'idle', notice: '', cancelled: false });
 							return;
 						}
-						if (audio.buffer.byteLength > MAX_BYTES) {
+						const limitBytes = Math.min(MAX_BYTES, runtime.limits?.maxAudioBytes ?? MAX_BYTES);
+						if (audio.buffer.byteLength > limitBytes) {
 							state.busy = false;
 							show({ phase: 'notice', notice: say('tooLarge'), cancelled: false });
 							return;
@@ -690,11 +730,17 @@ window.__ModuleLoader__.load({
 					if (document.hidden && (state.active || state.timer !== 0)) cancel(true);
 				};
 
+				/** Losing the window mid-capture abandons the recording, as the shipped plugin does. */
+				const onBlur = () => {
+					if (state.active) cancel(true);
+				};
+
 				card.addEventListener('pointerdown', onPointerDown, true);
 				card.addEventListener('pointerenter', onEnter);
 				card.addEventListener('pointerleave', onLeave);
 				document.addEventListener('keydown', onKeyDown, true);
 				document.addEventListener('visibilitychange', onVisibility);
+				window.addEventListener('blur', onBlur);
 
 				return () => {
 					card.removeEventListener('pointerdown', onPointerDown, true);
@@ -702,9 +748,11 @@ window.__ModuleLoader__.load({
 					card.removeEventListener('pointerleave', onLeave);
 					document.removeEventListener('keydown', onKeyDown, true);
 					document.removeEventListener('visibilitychange', onVisibility);
+					window.removeEventListener('blur', onBlur);
 					window.removeEventListener('resize', measure);
 					if (observer !== null) observer.disconnect();
 					clearTimer();
+					clearLimit();
 					detach();
 					state.run += 1;
 					if (state.abort !== null) state.abort.abort();
@@ -807,6 +855,16 @@ window.__ModuleLoader__.load({
 			// composer simply keeps its normal behaviour.
 			ctx.inject(['remote.speech', 'slots'], (scope) => {
 				runtime.speech = scope.remote.speech;
+				// Pick up the Host's real recording limits once. A failure or an unexpected
+				// envelope only leaves the conservative local defaults in place.
+				void (async () => {
+					try {
+						const catalog = await scope.remote.speech.catalog();
+						if (catalog !== undefined && catalog.ok === true) runtime.limits = catalog.value ?? null;
+					} catch (error) {
+						/* keep the defaults */
+					}
+				})();
 				scope.effect(() =>
 					scope.slots.inject(SLOT, () =>
 						scope.slots.register(
