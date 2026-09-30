@@ -161,12 +161,9 @@ Community directories index that topic automatically — notably
 whose daily crawler collects repositories tagged `dsh-plugin`, so no submission is needed
 there either.
 
-`install_bundle` also accepts an npm package name, so once this plugin is published to npm it
-can be installed by name instead of via git:
-
-```text
-plugin_manager → action: install_bundle → target: @jryang1997/dsh-composer-dictation
-```
+`install_bundle` also accepts an npm package name, but this plugin is **not published to npm**.
+Installing from the git URL above is the supported route, needs no registry account, and is the
+one this repository is tested against.
 
 ## Uninstall
 
