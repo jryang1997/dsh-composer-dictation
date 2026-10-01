@@ -1,0 +1,78 @@
+<img src="icon.svg" width="64" height="64" alt="Hold to talk logo">
+
+# Hold to talk
+
+[简体中文](README.md) · **English**
+
+Hold the mouse button in the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) message box and speak. Release to transcribe into your draft. **Nothing is sent automatically.**
+
+<p align="center">
+  <img src="docs/gesture-overview.svg" width="720" alt="Gesture overview: hold for about 0.3 seconds, speak, then release to transcribe into the draft">
+</p>
+
+## Ask your Agent to install
+
+Switch DeepSeek Harness to **Creator mode**, then copy this into an Agent conversation:
+
+```text
+Use plugin_manager to install and enable Hold to talk in my current DeepSeek Harness profile.
+
+First check the official voice-input module:
+@deepseek-ai/dsh-experimental-voice-input-bundle
+Install it if missing; otherwise make sure it is enabled.
+
+Then install this plugin:
+action: install_bundle
+target: github:jryang1997/dsh-hold-to-dictate
+If already installed, check that it is enabled instead of installing it again.
+
+Check whether the recognition models are ready. If I need to download models or
+grant microphone access, tell me where. When done, explain how to reload and test.
+```
+
+**The official voice-input module must be installed and enabled, with its recognition models ready.** On first use, click the built-in microphone button beside the message box and follow the prompts to download models and allow microphone access. This plugin uses that module's recognition service.
+
+After installation, reload the page. Hold the mouse button in the message box for about 0.3 seconds, say a sentence, then release. Once the text appears in your draft, you're ready.
+
+<details>
+<summary>Install from the command line</summary>
+
+With the official voice-input module already working, run:
+
+```bash
+dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-dictate
+```
+
+Replace `<profile>` with your profile name. The desktop app manages its `desktop` profile; use the Agent prompt above there.
+
+</details>
+
+## Use it
+
+- Hold the mouse button in the message box to record; release to transcribe.
+- Drag upward or outside the box, then release when the cancel cue appears to discard. You can also cancel with `Esc`.
+- Keyboard: hold `Ctrl + Shift + Space` to record, then release to transcribe.
+- If you edit the draft during recognition, the transcript stays in a small chip. Click it to insert the text.
+
+Under **Settings → Plugins → Hold to talk**, adjust hold duration, keyboard shortcut, hover hint and motion.
+
+## Update or uninstall
+
+GitHub installs do not update automatically. To update, send this to your Harness Agent:
+
+```text
+Update Hold to talk using plugin_manager. First remove the old installation with
+action: remove_bundle, target: @jryang1997/dsh-hold-to-dictate.
+Then install with action: install_bundle, target: github:jryang1997/dsh-hold-to-dictate.
+Remind me to reload the page. Keep the official voice-input module installed.
+```
+
+To uninstall, ask the Agent to remove `@jryang1997/dsh-hold-to-dictate`.
+
+## Before you dictate
+
+Recognition uses the speech service selected in Harness. The official default uses local SenseVoice; if you configure a cloud provider, audio is sent to that provider.
+
+Community plugin, unaffiliated with DeepSeek. Tested with DeepSeek Harness `0.1.7-rc.2`.
+
+[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Implementation notes](docs/design.md) · [Report an issue](https://github.com/jryang1997/dsh-hold-to-dictate/issues) · [MIT](LICENSE)

@@ -61,6 +61,7 @@ window.__ModuleLoader__.load({
 		const NOTICE_EXIT_MS = 180;
 		/** The meter keeps running after release so the bars fall instead of vanishing. */
 		const METER_SETTLE_MS = 240;
+		const COMPLETE_MS = 900;
 		/**
 		 * The level meter is the shipped voice-input waveform: a shift register of recent
 		 * RMS samples redrawn at 20 fps. The register *is* the smoothing — each new sample
@@ -75,6 +76,17 @@ window.__ModuleLoader__.load({
 		/** The press ring. Radius 15.5 draws a 36 px circle; the arc is a dash offset. */
 		const RING_RADIUS = 15.5;
 		const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+
+		/** Exact critically damped return; retarget from the current position and velocity. */
+		function settleLift(position, velocity, seconds) {
+			const frequency = 28;
+			const decay = Math.exp(-frequency * seconds);
+			const momentum = velocity + frequency * position;
+			return {
+				position: (position + momentum * seconds) * decay,
+				velocity: (velocity - frequency * momentum * seconds) * decay,
+			};
+		}
 
 		//#region config
 
@@ -255,6 +267,7 @@ window.__ModuleLoader__.load({
 			cancelReady: '松开丢弃',
 			cancelReadyHint: '松手即丢弃，移回输入框可继续',
 			transcribing: '识别中',
+			complete: '已插入草稿',
 			cancelled: '已取消',
 			empty: '没有识别到内容，可以说长一点再试',
 			tooShort: '太短了，按住再多说一会儿',
@@ -295,6 +308,7 @@ window.__ModuleLoader__.load({
 			cancelReady: 'Release to discard',
 			cancelReadyHint: 'releasing now discards it — move back to keep it',
 			transcribing: 'Transcribing',
+			complete: 'Added to draft',
 			cancelled: 'Cancelled',
 			empty: 'Nothing was recognized — try speaking a little longer',
 			tooShort: 'Too short — hold a little longer',
@@ -600,11 +614,11 @@ window.__ModuleLoader__.load({
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   user-select:none; pointer-events:none;
   opacity:0; translate:0 3px;
-  transition:opacity var(--dsh-htt-t-press) var(--dsh-htt-out),
-             translate var(--dsh-htt-t-press) var(--dsh-htt-out);
+  transition:opacity 320ms var(--dsh-htt-in-out),
+             translate 220ms var(--dsh-htt-out);
 }
 .dsh-htt-hint[data-on]{
-  opacity:1; translate:0 0; transition-duration:var(--dsh-htt-t-base);
+  opacity:1; translate:0 0;
 }
 
 /* ---- retained transcript ---------------------------------------------- */
@@ -623,6 +637,10 @@ window.__ModuleLoader__.load({
              scale var(--dsh-htt-t-press) var(--dsh-htt-out);
 }
 .dsh-htt-pending:active{scale:.96}
+.dsh-htt-pending:focus-visible{
+  outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+  outline-offset:3px;
+}
 @starting-style{.dsh-htt-pending{opacity:0; translate:0 4px}}
 .dsh-htt-pending[data-leaving]{
   opacity:0; translate:0 3px; scale:.97;
@@ -649,34 +667,41 @@ window.__ModuleLoader__.load({
   display:flex; justify-content:center;
   transform-origin:bottom center;
   pointer-events:none;
-  transition:opacity var(--dsh-htt-t-base) var(--dsh-htt-out),
-             scale var(--dsh-htt-t-base) var(--dsh-htt-out);
+  /* Fading an ancestor clips the child's backdrop until opacity reaches 1. */
+  transition:scale var(--dsh-htt-t-base) var(--dsh-htt-out);
 }
-@starting-style{.dsh-htt-bubble{opacity:0; scale:.9}}
+@starting-style{.dsh-htt-bubble{scale:.96}}
 .dsh-htt-bubble[data-leaving]{
-  opacity:0; scale:.94;
+  scale:.96;
   transition-duration:var(--dsh-htt-t-exit);
   transition-timing-function:var(--dsh-htt-in-out);
 }
 .dsh-htt-pill{
   position:relative; box-sizing:border-box;
   display:flex; align-items:center; gap:10px;
-  height:40px; padding:0 15px;
+  min-height:44px; max-width:calc(100% - 24px); padding:0 16px;
   border-radius:999px;
   --dsw-elevation-stroke-color:var(--dsw-alias-border-l1);
-  box-shadow:var(--dsw-elevation-prominent);
   color:var(--dsw-alias-label-primary);
   white-space:nowrap;
-  /* The bubble lifts as you drag: the gesture's direction is drawn, not just detected. */
-  translate:0 calc(var(--dsh-htt-cancel,0) * -6px);
-  transition:translate 120ms var(--dsh-htt-out);
+  /* Pointer tracking is direct; the existing meter clock springs it home on release. */
+  translate:0 var(--dsh-htt-lift,0px);
 }
 /* The host's own translucent-layer recipe, copied from MenuSurface.module.css. */
 .dsh-htt-material{
   position:absolute; inset:0; border-radius:inherit; pointer-events:none;
-  background:var(--dsw-specific-menu,var(--dsw-alias-bg-layer-2));
+  background:var(--dsw-menu-surface-fill,var(--dsw-specific-menu,var(--dsw-alias-bg-layer-2)));
   backdrop-filter:var(--dsw-menu-backdrop-filter,blur(40px) saturate(150%));
   -webkit-backdrop-filter:var(--dsw-menu-backdrop-filter,blur(40px) saturate(150%));
+  border:1px solid var(--dsw-alias-border-l1);
+  box-shadow:var(--dsw-elevation-prominent),inset 0 1px 0 color-mix(in srgb,var(--dsw-alias-bg-layer-1) 70%,transparent);
+  opacity:1; transition:opacity var(--dsh-htt-t-exit) var(--dsh-htt-in-out);
+}
+.dsh-htt-bubble[data-leaving] .dsh-htt-material{opacity:0}
+.dsh-htt-material::after{
+  content:''; position:absolute; inset:0; border-radius:inherit;
+  box-shadow:inset 0 0 16px color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent);
+  opacity:var(--dsh-htt-energy,0); transition:opacity 80ms linear;
 }
 /*
  * The discard wash. One opacity number drives the whole red state — the pill's ring, its
@@ -699,8 +724,12 @@ window.__ModuleLoader__.load({
 }
 .dsh-htt-body{
   position:relative; z-index:1;
-  display:flex; align-items:center; gap:10px;
+  display:flex; align-items:center; gap:10px; min-width:0; max-width:100%;
+  transition:opacity var(--dsh-htt-t-base) var(--dsh-htt-out),
+             translate var(--dsh-htt-t-base) var(--dsh-htt-out);
 }
+@starting-style{.dsh-htt-body{opacity:0;translate:0 3px}}
+.dsh-htt-bubble[data-leaving] .dsh-htt-body{opacity:0;translate:0 3px}
 
 /* ---- state mark: a mic-is-live dot that becomes the discard cross ------ */
 .dsh-htt-mark{position:relative; flex:0 0 auto; width:16px; height:16px; display:grid; place-items:center}
@@ -713,6 +742,23 @@ window.__ModuleLoader__.load({
   width:7px; height:7px; border-radius:50%;
   background:var(--dsw-alias-state-business-primary);
 }
+/* The halo follows real microphone energy, without an idle loop. */
+.dsh-htt-mark[data-state=recording] .dsh-htt-dot::before{
+  content:''; position:absolute; inset:1px; border-radius:50%;
+  background:var(--dsw-alias-state-business-primary);
+  opacity:calc(.08 + var(--dsh-htt-energy,0) * .2);
+  scale:calc(1 + var(--dsh-htt-energy,0) * .55);
+  transition:opacity 80ms linear, scale 80ms linear;
+}
+.dsh-htt-check{
+  position:absolute; inset:0; display:grid; place-items:center;
+  color:var(--dsw-alias-state-business-primary);
+  opacity:0; scale:.7;
+  transition:opacity 140ms var(--dsh-htt-out),scale 200ms var(--dsh-htt-out);
+}
+.dsh-htt-mark[data-state=complete] .dsh-htt-check{opacity:1;scale:1}
+.dsh-htt-mark[data-state=complete] .dsh-htt-dot,
+.dsh-htt-mark[data-state=complete] .dsh-htt-cross{opacity:0}
 /*
  * While recording the waveform is the activity, so the dot only marks that the mic is
  * live and stays still. It earns an animation only once transcribing drains the
@@ -732,19 +778,25 @@ window.__ModuleLoader__.load({
 }
 
 /* ---- level meter ------------------------------------------------------- */
-.dsh-htt-slot{position:relative; flex:0 0 auto; width:112px; height:22px}
+.dsh-htt-slot{position:relative; flex:0 1 112px; width:112px; min-width:40px; height:22px}
 .dsh-htt-wave{
   position:absolute; inset:0; display:block;
-  color:var(--dsw-alias-label-secondary);
+  color:var(--dsw-alias-state-business-primary);
   opacity:calc(1 - var(--dsh-htt-cancel,0) * .85);
   scale:calc(1 - var(--dsh-htt-cancel,0) * .16);
   transition:opacity 100ms linear, scale 100ms linear;
 }
+.dsh-htt-pill[data-phase=transcribing] .dsh-htt-wave{opacity:.28;scale:.94}
+.dsh-htt-pill[data-phase=complete] .dsh-htt-wave{opacity:.2;scale:.9}
+.dsh-htt-time{
+  color:var(--dsw-alias-label-secondary); font-size:11px; line-height:18px;
+  font-variant-numeric:tabular-nums; font-weight:400; flex:0 0 auto;
+}
 
 /* ---- one short label: text appears only where a mistake is possible ----- */
-.dsh-htt-row{display:grid; align-items:center}
+.dsh-htt-row{display:grid; align-items:center; min-width:0}
 .dsh-htt-row > *{
-  grid-area:1 / 1; white-space:nowrap;
+  grid-area:1 / 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   font-size:13px; line-height:18px; font-weight:500; letter-spacing:.01em;
   color:var(--dsw-alias-label-primary);
   opacity:0; translate:0 2px;
@@ -825,33 +877,39 @@ window.__ModuleLoader__.load({
 
 @media (prefers-reduced-motion:reduce){
   /* Gentler, not none: opacity and colour stay, movement goes. */
-  .dsh-htt-hint,.dsh-htt-pending,.dsh-htt-notice,.dsh-htt-row > *{
+  .dsh-htt-pending,.dsh-htt-notice,.dsh-htt-row > *,.dsh-htt-body{
     translate:none!important; scale:none!important;
     transition:opacity 140ms linear!important;
   }
-  .dsh-htt-bubble{scale:none!important; transition:opacity 140ms linear}
+  .dsh-htt-hint{translate:none!important;transition:opacity 320ms var(--dsh-htt-in-out)!important}
+  .dsh-htt-bubble{scale:none!important}
   .dsh-htt-pill{translate:none!important}
-  .dsh-htt-wave,.dsh-htt-cross{scale:none!important; transition:opacity 140ms linear}
+  .dsh-htt-wave,.dsh-htt-cross,.dsh-htt-check,
+  .dsh-htt-dot::before{scale:none!important; transition:opacity 140ms linear}
   .dsh-htt-mark[data-state=transcribing] .dsh-htt-dot-core{animation:none; opacity:.7}
   .dsh-htt-ring,.dsh-htt-ring-arc{transition-duration:1ms!important}
-  @starting-style{.dsh-htt-bubble{scale:none; opacity:0}}
+  @starting-style{.dsh-htt-bubble{scale:none}}
 }
 /*
  * The same softening as the prefers-reduced-motion query above, but chosen rather than
  * signalled. The duplication is deliberate: one is an operating-system preference and the
  * other is a setting, and CSS cannot share a declaration list across a media boundary.
  */
-.dsh-htt-layer[data-motion=calm] .dsh-htt-hint,
 .dsh-htt-layer[data-motion=calm] .dsh-htt-pending,
 .dsh-htt-layer[data-motion=calm] .dsh-htt-notice,
-.dsh-htt-layer[data-motion=calm] .dsh-htt-row > *{
+.dsh-htt-layer[data-motion=calm] .dsh-htt-row > *,
+.dsh-htt-layer[data-motion=calm] .dsh-htt-body{
   translate:none!important; scale:none!important;
   transition:opacity 140ms linear!important;
 }
-.dsh-htt-layer[data-motion=calm] .dsh-htt-bubble{scale:none!important; transition:opacity 140ms linear}
+.dsh-htt-layer[data-motion=calm] .dsh-htt-hint{translate:none!important;transition:opacity 320ms var(--dsh-htt-in-out)!important}
+.dsh-htt-layer[data-motion=calm] .dsh-htt-bubble{scale:none!important}
 .dsh-htt-layer[data-motion=calm] .dsh-htt-pill{translate:none!important}
 .dsh-htt-layer[data-motion=calm] .dsh-htt-wave,
-.dsh-htt-layer[data-motion=calm] .dsh-htt-cross{scale:none!important; transition:opacity 140ms linear}
+.dsh-htt-layer[data-motion=calm] .dsh-htt-cross,
+.dsh-htt-layer[data-motion=calm] .dsh-htt-check,
+.dsh-htt-layer[data-motion=calm] .dsh-htt-dot::before{scale:none!important; transition:opacity 140ms linear}
+.dsh-htt-layer[data-motion=calm] .dsh-htt-mark[data-state=transcribing] .dsh-htt-dot-core{animation:none; opacity:.7}
 .dsh-htt-layer[data-motion=calm] .dsh-htt-ring,
 .dsh-htt-layer[data-motion=calm] .dsh-htt-ring-arc{transition-duration:1ms!important}
 
@@ -867,6 +925,7 @@ window.__ModuleLoader__.load({
     backdrop-filter:none; -webkit-backdrop-filter:none;
   }
   .dsh-htt-pill{--dsw-elevation-stroke-color:var(--dsw-alias-border-l3)}
+  .dsh-htt-material::after{display:none}
 }
 `;
 
@@ -1217,10 +1276,10 @@ window.__ModuleLoader__.load({
 
 		const IDLE = {
 			phase: 'idle', notice: '', tone: 'info', leaving: false, cancelled: false, pending: '',
-			pendingLeaving: false, bubbleLeaving: false, arm: null, armLeaving: false, retryable: false,
+			pendingLeaving: false, bubbleLeaving: false, arm: null, armLeaving: false, retryable: false, elapsed: 0,
 		};
-		/** The phases that put the recording bubble on screen. */
-		const BUSY_PHASES = new Set(['recording', 'transcribing']);
+		/** Completion remains visible briefly, but never blocks another recording. */
+		const BUBBLE_PHASES = new Set(['recording', 'transcribing', 'complete']);
 		/** Below this much room in the tool row the hint is dropped rather than overlapped. */
 		const HINT_MIN_PX = 48;
 		/*
@@ -1233,6 +1292,7 @@ window.__ModuleLoader__.load({
 		function HoldToTalk(props) {
 			const root = React.useRef(null);
 			const wave = React.useRef(null);
+			const commands = React.useRef({});
 			const [hovered, setHovered] = React.useState(false);
 			const [view, setView] = React.useState(IDLE);
 			const [box, setBox] = React.useState({ height: 0, rowHeight: 0, hintRight: 14, hintMax: 0 });
@@ -1350,6 +1410,10 @@ window.__ModuleLoader__.load({
 					waveLines: null,
 					waveLevels: null,
 					waveDraining: false,
+					recordedAt: null,
+					elapsed: 0,
+					lift: { position: 0, velocity: 0 },
+					motionAt: null,
 				};
 
 				const say = (key, params) => translate(latest.current.props, key, params);
@@ -1387,8 +1451,8 @@ window.__ModuleLoader__.load({
 					if (patchValues.phase !== undefined) {
 						if (patchValues.phase !== 'notice') clearNotice();
 						clearBubbleExit();
-						const leaving = BUSY_PHASES.has(latest.current.view.phase)
-							&& !BUSY_PHASES.has(patchValues.phase);
+						const leaving = BUBBLE_PHASES.has(latest.current.view.phase)
+							&& !BUBBLE_PHASES.has(patchValues.phase);
 						latest.current.setView((current) => ({
 							...current,
 							leaving: false,
@@ -1403,6 +1467,10 @@ window.__ModuleLoader__.load({
 						}
 					} else {
 						latest.current.setView((current) => ({ ...current, leaving: false, ...patchValues }));
+					}
+					if (patchValues.phase === 'complete') {
+						state.noticeHold = window.setTimeout(() => show({ phase: 'idle' }), COMPLETE_MS);
+						return;
 					}
 					if (patchValues.phase !== 'notice') return;
 					clearNotice();
@@ -1577,6 +1645,10 @@ window.__ModuleLoader__.load({
 					const threshold = state.cancelled ? CANCEL_RELEASE_PX : CANCEL_ARM_PX;
 					setCancelArmed(outside || upward >= threshold);
 					applyCancel(outside ? 1 : Math.max(0, Math.min(1, upward / CANCEL_ARM_PX)));
+					// A soft 12px boundary keeps the capsule near its composer, even on a long drag.
+					state.lift.position = -12 * upward / (Math.abs(upward) + CANCEL_ARM_PX);
+					state.lift.velocity = velocity() * 12 * CANCEL_ARM_PX / (Math.abs(upward) + CANCEL_ARM_PX) ** 2;
+					root.current?.style.setProperty('--dsh-htt-lift', `${state.lift.position.toFixed(3)}px`);
 				};
 
 				const resetGesture = () => {
@@ -1629,8 +1701,20 @@ window.__ModuleLoader__.load({
 					const tick = (now) => {
 						if (state.meter !== token) return;
 						state.raf = window.requestAnimationFrame(tick);
+						if (state.motionAt !== null && !state.active) {
+							state.lift = settleLift(state.lift.position, state.lift.velocity, Math.min(.05, (now - state.motionAt) / 1000));
+							root.current?.style.setProperty('--dsh-htt-lift', `${state.lift.position.toFixed(3)}px`);
+						}
+						state.motionAt = now;
 						if (now - state.waveAt < WAVE_INTERVAL_MS) return;
 						state.waveAt = now;
+						if (state.active && state.recordedAt !== null) {
+							const elapsed = Math.floor((now - state.recordedAt) / 1000);
+							if (elapsed !== state.elapsed) {
+								state.elapsed = elapsed;
+								patch({ elapsed });
+							}
+						}
 						const svg = wave.current;
 						if (svg === null) return;
 						if (state.waveLines === null) {
@@ -1642,6 +1726,7 @@ window.__ModuleLoader__.load({
 						const levels = state.waveLevels;
 						const shifts = state.waveDraining ? WAVE_DRAIN_PER_TICK : 1;
 						let next = state.waveDraining ? 0 : capture.level();
+						root.current?.style.setProperty('--dsh-htt-energy', Math.min(1, next * WAVE_SAMPLE_GAIN).toFixed(3));
 						for (let step = 0; step < shifts; step += 1) {
 							for (let index = 0; index < levels.length; index += 1) {
 								const previous = levels[index];
@@ -1672,6 +1757,8 @@ window.__ModuleLoader__.load({
 					state.meterStop = window.setTimeout(() => {
 						state.meterStop = 0;
 						state.meter += 1;
+						state.lift = { position: 0, velocity: 0 };
+						root.current?.style.setProperty('--dsh-htt-lift', '0px');
 					}, METER_SETTLE_MS);
 				};
 
@@ -1700,7 +1787,12 @@ window.__ModuleLoader__.load({
 					state.waveLevels = null;
 					state.waveDraining = false;
 					state.waveAt = -Infinity;
-					show({ phase: 'recording', notice: '', cancelled: false });
+					state.recordedAt = null;
+					state.elapsed = 0;
+					state.motionAt = null;
+					state.lift = { position: 0, velocity: 0 };
+					root.current?.style.setProperty('--dsh-htt-lift', '0px');
+					show({ phase: 'recording', notice: '', cancelled: false, elapsed: 0 });
 					// The ring has done its job; the bubble takes the story from here.
 					dropRing();
 
@@ -1718,6 +1810,7 @@ window.__ModuleLoader__.load({
 					state.starting = starting;
 					try {
 						await starting;
+						if (run === state.run) state.recordedAt = performance.now();
 					} catch (error) {
 						if (run !== state.run) return;
 						stopMeter(false);
@@ -1827,7 +1920,7 @@ window.__ModuleLoader__.load({
 							return;
 						}
 						state.retry = null;
-						show({ phase: 'idle', notice: '', cancelled: false });
+						show({ phase: 'complete', notice: '', cancelled: false });
 					} catch (error) {
 						if (run !== state.run) return;
 						state.busy = false;
@@ -1848,7 +1941,7 @@ window.__ModuleLoader__.load({
 					if (actions === undefined || pending === '' || latest.current.view.pendingLeaving) return;
 					if (actions.insertText(pending, actions.captureInsertion()) === true) {
 						// The text just landed, so the chip folds away instead of blinking out.
-						show({ phase: 'idle', notice: '' });
+						show({ phase: 'complete', notice: '' });
 						dropPending();
 						return;
 					}
@@ -1858,8 +1951,8 @@ window.__ModuleLoader__.load({
 				function onPointerDown(event) {
 					if (event.button !== 0) return;
 					if (state.active || state.timer !== 0) return;
-					// The retained-transcript chip is a real control; it must not arm the gesture.
-					if (event.target instanceof Element && event.target.closest('.dsh-htt-pending') !== null) return;
+					// Plugin controls must not arm the card's capture-phase gesture.
+					if (event.target instanceof Element && event.target.closest('.dsh-htt-pending, .dsh-htt-failure') !== null) return;
 					if (latest.current.props.inputActions === undefined) return;
 					/*
 					 * A finger is a different instrument from a mouse. It rolls, so it needs more
@@ -2049,8 +2142,11 @@ window.__ModuleLoader__.load({
 				document.addEventListener('selectstart', onSuppress, true);
 				document.addEventListener('visibilitychange', onVisibility);
 				window.addEventListener('blur', onBlur);
+				// Rendered buttons use the same effect-owned commands as the gesture listeners.
+				commands.current = { insertPending, retryFailure, dismissFailure };
 
 				return () => {
+					commands.current = {};
 					card.removeEventListener('pointerdown', onPointerDown, true);
 					card.removeEventListener('pointerenter', onEnter);
 					card.removeEventListener('pointerleave', onLeave);
@@ -2087,13 +2183,14 @@ window.__ModuleLoader__.load({
 			// never lost; the chip is the only affordance that can still insert it.
 			const pending = view.pending;
 			const recording = view.phase === 'recording';
+			const completed = view.phase === 'complete';
 			const busy = recording || view.phase === 'transcribing';
 			const cancelled = recording && view.cancelled;
 			// The hint is shown only when the tool row genuinely has room for it.
 			const showHint = hovered && view.phase === 'idle' && pending === ''
 				&& config.get('hint') && box.hintMax >= HINT_MIN_PX;
 			const showPending = !busy && (pending !== '' || view.pendingLeaving);
-			const showBubble = busy || view.bubbleLeaving;
+			const showBubble = busy || completed || view.bubbleLeaving;
 
 			/**
 			 * Every variant of the label lives in the same grid cell, so the pill is always as
@@ -2180,7 +2277,7 @@ window.__ModuleLoader__.load({
 							onPointerDown: (event) => event.stopPropagation(),
 							// Keep the caret where it was: the insert reads the editor's own selection.
 							onMouseDown: (event) => event.preventDefault(),
-							onClick: () => insertPending(),
+							onClick: () => commands.current.insertPending?.(),
 						},
 						h(MicGlyph, { size: 14 }),
 						h('span', null, translate(props, 'pending')),
@@ -2195,13 +2292,14 @@ window.__ModuleLoader__.load({
 							'div',
 							{
 								className: 'dsh-htt-pill',
+								'data-phase': view.phase,
 								role: 'status',
 								'aria-live': 'polite',
 								'aria-label': recording
 									? cancelled
 										? `${translate(props, 'cancelReady')} · ${translate(props, 'cancelReadyHint')}`
 										: `${translate(props, 'release')} · ${translate(props, 'cancelHint')}`
-									: translate(props, 'transcribing'),
+									: translate(props, completed ? 'complete' : 'transcribing'),
 							},
 							h('span', { className: 'dsh-htt-material', 'aria-hidden': true }),
 							h('span', { className: 'dsh-htt-alarm', 'aria-hidden': true }),
@@ -2212,11 +2310,12 @@ window.__ModuleLoader__.load({
 									'span',
 									{
 										className: 'dsh-htt-mark',
-										'data-state': recording ? 'recording' : 'transcribing',
+										'data-state': completed ? 'complete' : recording ? 'recording' : 'transcribing',
 										'aria-hidden': true,
 									},
 									h('span', { className: 'dsh-htt-dot' }, h('span', { className: 'dsh-htt-dot-core' })),
 									h('span', { className: 'dsh-htt-cross' }, h(DiscardGlyph, { size: 10 })),
+									h('span', { className: 'dsh-htt-check' }, h(NoticeGlyph, { tone: 'success' })),
 								),
 								h(
 									'span',
@@ -2245,7 +2344,8 @@ window.__ModuleLoader__.load({
 									),
 								),
 								labelRow([
-									{ key: 'transcribe', on: !recording, text: translate(props, 'transcribing') },
+									{ key: 'transcribe', on: !recording && !completed, text: translate(props, 'transcribing') },
+									{ key: 'complete', on: completed, text: translate(props, 'complete') },
 									{ key: 'release', on: recording && !cancelled, text: translate(props, 'release') },
 									{
 										key: 'cancel',
@@ -2254,6 +2354,8 @@ window.__ModuleLoader__.load({
 										tone: 'error',
 									},
 								]),
+								h('span', { className: 'dsh-htt-time', 'aria-hidden': true },
+									`${String(Math.floor((view.elapsed ?? 0) / 60)).padStart(2, '0')}:${String((view.elapsed ?? 0) % 60).padStart(2, '0')}`),
 							),
 						),
 					),
@@ -2289,7 +2391,7 @@ window.__ModuleLoader__.load({
 									className: 'dsh-htt-action',
 									onPointerDown: (event) => event.stopPropagation(),
 									onMouseDown: (event) => event.preventDefault(),
-									onClick: () => retryFailure(),
+									onClick: () => commands.current.retryFailure?.(),
 								},
 								translate(props, 'retry'),
 							),
@@ -2302,7 +2404,7 @@ window.__ModuleLoader__.load({
 								title: translate(props, 'dismiss'),
 								onPointerDown: (event) => event.stopPropagation(),
 								onMouseDown: (event) => event.preventDefault(),
-								onClick: () => dismissFailure(),
+								onClick: () => commands.current.dismissFailure?.(),
 							},
 							h(DiscardGlyph, { size: 11 }),
 						),

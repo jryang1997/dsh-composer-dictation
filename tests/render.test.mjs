@@ -21,7 +21,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(join(here, '..', 'client.js'), 'utf8');
+// Expose the pure spring only to this harness, without expanding the plugin API.
+const source = readFileSync(join(here, '..', 'client.js'), 'utf8')
+	.replace('return { inject, apply };', 'return { inject, apply, settleLift };');
 
 /*
  * The plugin asks `event.target instanceof Element`, and Node has no DOM at all. Declaring
@@ -63,6 +65,7 @@ const fire = (type, event) => {
 let loaded = null;
 /** Timer ids are recorded rather than stubbed away: the hold duration is a real assertion. */
 const timeouts = [];
+const clearedTimers = new Set();
 let timerId = 0;
 const fakeDocument = {
 	hidden: false,
@@ -77,7 +80,7 @@ const fakeWindow = {
 		timeouts.push({ id: timerId, fn, ms });
 		return timerId;
 	},
-	clearTimeout: () => undefined,
+	clearTimeout: (id) => clearedTimers.add(id),
 	requestAnimationFrame: () => 0,
 	cancelAnimationFrame: () => undefined,
 	addEventListener: listen,
@@ -372,6 +375,57 @@ check(!names.includes('dsh-htt-panel'), 'the old full-card panel is gone');
 check(attrs(tree, 'strokeWidth').length === 28, `the waveform is 28 bars (got ${attrs(tree, 'strokeWidth').length})`);
 check(attrs(tree, 'aria-live').length === 1, 'the capsule is the single live region');
 
+const timed = find(render(false, { ...IDLE, phase: 'recording', elapsed: 65 }), 'dsh-htt-time');
+check(timed.children[0] === '01:05', 'elapsed recording time formats across a minute boundary');
+check(timed.props['aria-hidden'] === true, 'the clock does not announce every second');
+
+tree = render(false, { ...IDLE, phase: 'complete', elapsed: 65 });
+check(classes(tree).includes('dsh-htt-check'), 'completion carries a checkmark');
+check(litText(tree).join('|') === '已插入草稿', 'completion clearly confirms draft insertion');
+check(find(tree, 'dsh-htt-time').children[0] === '01:05', 'completion keeps the clock space and duration');
+check(find(tree, 'dsh-htt-pill').props['aria-label'] === '已插入草稿', 'completion announces the result');
+
+// A retained transcript must really insert, not just render as a clickable chip.
+tree = render(false, { ...IDLE, pending: '保留的转写' });
+const insertedBefore = inputActions.inserted.length;
+find(tree, 'dsh-htt-pending').props.onClick();
+check(inputActions.inserted.length === insertedBefore + 1
+	&& inputActions.inserted.at(-1) === '保留的转写', 'the retained-transcript button uses the active insertion command');
+check(setCalls.some((update) => typeof update === 'function' && update(IDLE).phase === 'complete'),
+	'a successful insertion enters completion');
+check(timeouts.at(-2)?.ms === 900, 'completion clears itself without waiting for another gesture');
+const completionTimer = timeouts.at(-2).id;
+fire('keydown', key());
+check(clearedTimers.has(completionTimer), 'a new recording cancels the previous completion timer');
+
+tree = render(false, { ...IDLE, phase: 'failed', retryable: true });
+for (const button of findAll(tree, 'dsh-htt-action')) button.props.onClick();
+check(setCalls.some((update) => typeof update === 'function' && update(IDLE).phase === 'idle'),
+	'failure actions use the active commands and dismiss to idle');
+
+const control = new Element();
+control.closest = () => ({});
+render(false, IDLE);
+const timersBeforeControl = timeouts.length;
+fire('pointerdown', { button: 0, target: control });
+check(timeouts.length === timersBeforeControl, 'plugin controls never arm the capture-phase recording gesture');
+
+// The release spring preserves velocity and has the same result at different frame rates.
+const still = bundle.settleLift(0, 0, 1);
+check(still.position === 0 && still.velocity === 0, 'the spring stays at rest');
+const direct = bundle.settleLift(-8, -20, .2);
+let subdivided = { position: -8, velocity: -20 };
+for (let frame = 0; frame < 12; frame += 1) {
+	subdivided = bundle.settleLift(subdivided.position, subdivided.velocity, 1 / 60);
+}
+check(Math.abs(direct.position - subdivided.position) < 1e-9
+	&& Math.abs(direct.velocity - subdivided.velocity) < 1e-9, 'the spring is independent of frame rate');
+const handoff = bundle.settleLift(-8, -20, 0);
+check(handoff.position === -8 && handoff.velocity === -20, 'the release starts at the current position and velocity');
+check(Math.abs(bundle.settleLift(-8, -20, .24).position) < .1, 'the spring settles before the meter clock stops');
+
+// Return to recording for the following discard-state assertions.
+
 // Recording, discard armed: the copy is the only place text is allowed to appear.
 tree = render(true, { ...IDLE, phase: 'recording', cancelled: true });
 check(
@@ -626,6 +680,14 @@ check(css.includes('@starting-style'), 'entry rides @starting-style');
 check(css.includes('[data-leaving]'), 'exit rides a data-leaving transition');
 check(!/@keyframes[^{]*\{[^}]*bubble/.test(css), 'the bubble is not animated by keyframes');
 
+// An opacity-animated ancestor creates a backdrop root and clips the glass on entry.
+const bubbleRules = [...css.matchAll(/\.dsh-htt-bubble(?:\[data-leaving\])?\{([^}]*)\}/g)];
+check(bubbleRules.length > 0 && bubbleRules.every((match) => !/opacity\s*:|(?:transition|will-change):[^;]*opacity/.test(match[1])),
+	'the bubble never fades an ancestor of the glass, including calm and reduced motion');
+check(rule(css, '.dsh-htt-material{').includes('opacity:1'), 'the glass is visible from its first frame');
+check(rule(css, '.dsh-htt-bubble[data-leaving] .dsh-htt-material{').includes('opacity:0'),
+	'exit fades the material itself rather than clipping its backdrop');
+
 // Nothing that floats over the transcript may take a click; and a surface that is still
 // mounted while it fades must stop accepting input, because `opacity: 0` removes nothing
 // from hit testing.
@@ -661,6 +723,13 @@ check(/opacity 140ms linear/.test(reduced), 'reduced motion still cross-fades');
 
 // The calm setting is the same softening, chosen rather than signalled.
 check(css.includes('.dsh-htt-layer[data-motion=calm]'), 'the calm preference has its own rules');
+check(rule(css, '.dsh-htt-pill{').includes('var(--dsh-htt-lift,0px)')
+	&& !rule(css, '.dsh-htt-pill{').includes('transition:'), 'gesture position follows the pointer without a CSS transition lag');
+check(css.includes('var(--dsh-htt-energy,0)'), 'the recording halo responds to microphone energy');
+check(rule(css, '.dsh-htt-pill{').includes('max-width:calc(100% - 24px)')
+	&& rule(css, '.dsh-htt-row > *').includes('text-overflow:ellipsis'), 'narrow composers constrain and truncate the capsule');
+check(css.includes('.dsh-htt-layer[data-motion=calm] .dsh-htt-mark[data-state=transcribing]'),
+	'calm also disables the processing loop');
 
 // The hint sits in the tool row, so it has to speak the tool row's typography.
 const hintRule = rule(css, '.dsh-htt-hint{');
@@ -670,6 +739,12 @@ check(hintRule.includes('font-size:13px') && hintRule.includes('font-weight:400'
 check(!hintRule.includes('letter-spacing'), 'and carries no tracking of its own');
 // The 500-weight rule in the host's InputBar stylesheet is dead CSS; copying it was a mistake.
 check(!hintRule.includes('font-weight:500'), 'and is not weighted like a chip');
+check(hintRule.includes('transition:opacity 320ms var(--dsh-htt-in-out)'),
+	'the hint softly fades in and out over 320 ms');
+check(!rule(css, '.dsh-htt-hint[data-on]{').includes('transition:'),
+	'entering and leaving the hint use the same fade duration');
+check(find(render(false, IDLE), 'dsh-htt-hint') !== null,
+	'the hint stays mounted after pointer leave so its fade can finish');
 
 // The settings page brings its own stylesheet, because it renders in a different slot.
 const settingsCss = styleText(mountSettings());

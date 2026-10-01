@@ -5,11 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        This plugin is deliberately narrow: it does one gesture and reuses the Host's speech
-        service. Ideas that fit are usually about **the gesture, the recording surface, or
-        what happens when a host contract is missing**. Ideas that add a second way to do the
-        same thing tend to be declined — see *Known limitations* in the README for the ones
-        that are already on the list.
+        Describe how the change would help you use Hold to talk. Check the README and
+        existing issues first to see whether the feature is already available or proposed.
 
   - type: textarea
     id: problem
@@ -46,7 +43,7 @@ body:
     attributes:
       label: Checks
       options:
-        - label: I read *Known limitations* in the README.
+        - label: I read the README.
           required: true
         - label: I searched the existing issues.
           required: true

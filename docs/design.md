@@ -96,9 +96,22 @@ hairline reuses `--dsw-radius-panel` (the card's own 28 px, rendered as a squirc
 app-wide `corner-shape: superellipse(1.5)`).
 
 Entry is a `@starting-style` transition and exit a `data-leaving` attribute, never a
-keyframe, so a gesture reversed mid-flight retargets from its current value. The level meter
-is the shipped voice input's waveform: a 40-slot shift register of RMS samples redrawn at
+keyframe, so a surface reversed mid-flight retargets from its current value. The glass is
+visible immediately; only its contents fade in. Fading an ancestor creates a backdrop root
+and temporarily clips the blur, so exit fades the material itself. The hover hint uses a
+320 ms opacity transition in both directions, including calm and reduced motion. Gesture position
+is separate: pointer movement writes the capsule's lift directly, within a soft 12 px
+boundary. Release hands its current position and velocity to a critically damped spring,
+stepped by the existing meter clock for 240 ms. There is no second animation loop or dependency.
+The level meter is the shipped voice input's waveform: a 28-slot shift register of RMS samples redrawn at
 20 fps. `tests/render.test.mjs` asserts all of this, so the rules cannot rot silently.
+
+The host accent colours both the waveform and a halo driven by measured microphone energy.
+The elapsed clock starts after microphone acquisition; its digits are tabular and hidden
+from screen readers so it never announces every second. On successful insertion, the same
+capsule shows a checkmark for 900 ms while keeping its clock space. A new recording clears
+that timer immediately. Calm/reduced motion removes lift and scale; reduced transparency
+and increased contrast use the host's opaque surface instead.
 
 ## Speech recognition
 

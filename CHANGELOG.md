@@ -7,6 +7,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- A new voice-bubble icon pairs a rounded speech capsule with three waveform bars.
+- The README is now a concise Chinese homepage with a separate English page. Agent
+  installation prompts include the official voice-input module and model preparation.
+- Recording uses the host accent colour, an audio-reactive halo, a subtly lit material
+  and a stable elapsed-time display.
+- Drag-to-discard follows the pointer directly within a soft boundary. Release returns
+  the capsule with a velocity-preserving spring on the existing animation clock.
+- Successful draft insertion briefly shows a checkmark and confirmation. A new recording
+  interrupts that feedback immediately; narrow composers constrain the capsule width.
+- Calm motion disables the processing loop too. Reduced motion, reduced transparency
+  and increased contrast retain equivalent feedback.
+
+### Fixed
+
+- The hover hint fades in and out softly over 320 ms, including calm and reduced motion.
+- The recording capsule has its glass background from the first frame. Entry fades the
+  contents instead of an ancestor that would clip backdrop filtering.
+- Rendered transcript and failure buttons call the active gesture commands; pressing
+  those controls cannot arm the composer's recording gesture.
+
 ## [2.0.0] - 2026-10-01
 
 The name changed. Nothing about what the plugin does changed with it — this is a major version
