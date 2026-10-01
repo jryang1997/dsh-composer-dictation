@@ -324,7 +324,8 @@ be pinned to it. The short version:
 
 | Version | What it was about |
 |---|---|
-| [1.5.1](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.1) | A correction: the duplicate microphone from 1.4.0 is gone, the hover hint joins the tool row's typography, and the glyph is the host's own |
+| [1.5.2](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.2) | The hover hint was aligned to a rule nothing renders; the real model selector is one weight lighter, and the row's asymmetric padding put the hint 2 px low |
+| [1.5.1](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.1) | A correction: the duplicate microphone from 1.4.0 is gone, and the glyph is the host's own |
 | [1.5.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.0) | A separate hold for a finger, and suppression of the word selection and native menu a long press otherwise triggers — the host does nothing about touch at all |
 | [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | A focusable microphone button in the tool row — the keyboard entry finally becomes findable |
 | [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | A settings page, and the configuration module it forced into existence |
@@ -606,7 +607,8 @@ plugin_manager → action: install_bundle → target: github:jryang1997/dsh-comp
 
 | 版本 | 这一版在解决什么 |
 |---|---|
-| [1.5.1](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.1) | 一次纠正：1.4.0 那个重复的麦克风拆掉了，提示行归入工具行的排版，图标换成宿主自己的 |
+| [1.5.2](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.2) | 提示行之前对齐到了一条没人渲染的规则；真正的模型选择器轻一档，而行内的不对称 padding 让提示行低了 2px |
+| [1.5.1](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.1) | 一次纠正：1.4.0 那个重复的麦克风拆掉了，图标换成宿主自己的 |
 | [1.5.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.0) | 手指有自己的一套阈值，并且拦掉长按本来会触发的选词与原生菜单 —— 宿主对触摸完全不管 |
 | [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | 工具行里一个可聚焦的麦克风按钮 —— 键盘入口终于变得找得到 |
 | [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | 设置页，以及它逼出来的那个配置模块 |

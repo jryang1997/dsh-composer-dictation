@@ -1,6 +1,6 @@
 {
   "name": "@jryang1997/dsh-composer-dictation",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "type": "module",
   "description": "Hold-to-talk dictation for the DeepSeek Harness composer: long-press the input box, release to transcribe into the draft",
   "license": "MIT",

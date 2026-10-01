@@ -7,6 +7,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-10-01
+
+1.5.1 aligned the hover hint to a CSS rule that turned out not to be rendered by anything.
+
+### Fixed
+
+- **The hint was given the wrong font weight.** 1.5.1 copied `13px / 500 / 20px` from the
+  InputBar stylesheet's `.RlGAzG_select` rule. That rule is **dead CSS** — nothing in the host
+  renders it, so it is the wrong thing to align to. The real model selector is `ModelSelect`'s
+  trigger, and it is **13px / 400 / 20px** with normal tracking. The hint was therefore one
+  weight too heavy; it is now 400, which is what it had before 1.5.1 and what the control
+  beside it actually uses. The 500 in the InputBar stylesheet belongs to the permission chip,
+  and a chip is not body text.
+- **Vertical alignment is now measured rather than assumed.** 1.5.1 centred the hint on the
+  tool row's box, which is `padding: 2px 8px 6px` — asymmetric. Every control in that row is
+  centred on the *content* box instead, so a box-centred hint sat exactly **2 px lower** than
+  the model selector beside it: too small to name, large enough to read as "something is off".
+  The hint is now centred on the trailing group's own measured box, so it lands on the same
+  line box as the control it sits next to whatever the row's padding happens to be.
+
 ## [1.5.1] - 2026-10-01
 
 A correction. 1.4.0 fixed a problem that did not exist.
@@ -224,7 +244,8 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.2...HEAD
+[1.5.2]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.3.0...v1.4.0
