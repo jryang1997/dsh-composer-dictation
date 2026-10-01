@@ -123,6 +123,7 @@ activated.
 | Press `Esc` while recording or transcribing | Cancel |
 | Hold, then drag up ≥48 px **or move the pointer off the box** | The capsule and the card's outline wash red and the word changes to "release to discard"; release there to drop it, come back to keep it |
 | **Hold `Ctrl`+`Shift`+`Space`**, then release | The same gesture with no mouse: hold the chord to record, let go to transcribe |
+| Click the **microphone button** in the tool row | A toggle rather than a hold: press to start, press again to finish. This is the seat a keyboard or screen-reader user can actually find |
 | A plain click, a drag, or selecting text | Nothing happens — the arc retracts and the gesture never arms |
 
 ### Keyboard
@@ -135,6 +136,13 @@ chip all behave identically.
 
 The chord is deliberately awkward to hit by accident, and it never claims a keystroke unless
 it actually starts a recording.
+
+And there is a **button**: a 28 px microphone in the composer's tool row, to the left of the
+model selector. It is a real control — Tab reaches it, Enter activates it, and
+`aria-keyshortcuts` on it is how a keyboard user discovers the chord exists. Its model is a
+**toggle** rather than a hold (press to start, press again to finish), because keeping a key
+pressed with a button is an awkward thing to ask, and because that is what the shipped
+microphone does.
 
 ### Settings
 
@@ -253,10 +261,9 @@ Interface-by-interface notes, verified against the shipped packages, live in
 
 ## Known limitations
 
-- **The keyboard shortcut is documented, not advertised.** `Ctrl`+`Shift`+`Space` starts and
-  ends a recording and is the only way in without a pointer — but nothing in the interface
-  says so, because the plugin owns no control it could hang the hint on. A focusable trigger
-  would fix that properly, and the slot this plugin renders into does not offer one.
+- **The tool-row button is hidden while the shipped voice input is expanded.** It lives in
+  `conversation.input.left`, and the composer hides that whole group when the official
+  microphone's activity expands — so during an official recording, the chord is the only way in.
 - **Mouse-first.** Touch input is untested: on a touch screen a long press also drives text
   selection, so the thresholds would probably need tuning there.
 - **The hint needs room.** It lives in the tool row's empty middle, so on a very narrow
@@ -313,6 +320,7 @@ be pinned to it. The short version:
 
 | Version | What it was about |
 |---|---|
+| [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | A focusable microphone button in the tool row — the keyboard entry finally becomes findable |
 | [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | A settings page, and the configuration module it forced into existence |
 | [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | A keyboard equivalent for the gesture, retry in place when the Host hiccups, and failures that wait for an answer instead of flashing past |
 | [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | Recording stopped taking the composer over: a floating capsule, an acknowledged press, real exits, and a motion vocabulary borrowed from the host |
@@ -416,6 +424,7 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 | 按住后上滑 ≥48 px，**或把鼠标移出输入框** | 胶囊与输入框外框一起泛红、文字变成「松开丢弃」；在那里松手即丢弃，移回来则保留 |
 | 单击、拖拽、拖选文字 | 什么都不发生 —— 进度环自己退回，手势不会激活 |
 | **按住 `Ctrl`+`Shift`+`空格`**，然后松开 | 同一套手势，只是不用鼠标：按住和弦开始录音，松开即转写 |
+| 点工具行里的**麦克风按钮** | 开关而非按住：按一下开始，再按一下结束。这是键盘与读屏用户真正找得到的入口 |
 
 ### 键盘
 
@@ -424,6 +433,10 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 胶囊、波形、丢弃红晕、保留转写的胶囊，行为完全一致。
 
 和弦刻意做得不容易误触，并且**只在真正开始录音时才拦截按键**。
+
+另外还有一个**按钮**：工具行里、模型选择器左侧的一枚 28 px 麦克风。它是真正的控件 —— Tab 能到、
+回车能按，而它身上的 `aria-keyshortcuts` 正是键盘用户发现快捷键存在的地方。它的模型是**开关**
+而不是按住（按一下开始、再按一下结束），因为用按钮去"按住不放"很别扭，而且官方麦克风就是这么做的。
 
 ### 设置
 
@@ -532,9 +545,8 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 
 ## 已知限制
 
-- **键盘快捷键只写在文档里，没有在界面上宣传。** `Ctrl`+`Shift`+`空格` 能起停录音，也是无指针
-  用户唯一的入口 —— 但界面上没有任何地方说明它，因为这个插件没有任何一个它能挂提示的控件。
-  加一个可聚焦的触发按钮才是正经解法，而本插件所在的座位不提供这样的位置。
+- **官方语音展开时，工具行的按钮会被隐藏。** 它住在 `conversation.input.left`，而输入框在官方
+  麦克风的 activity 展开时会把这一整组隐藏 —— 所以官方录音期间，和弦是唯一入口。
 - **以鼠标为主。** 触摸屏未验证：触摸长按同时会驱动文本选择，阈值大概需要另调。
 - **提示行需要空间。** 它待在工具行中间的空档里，所以输入框特别窄时（模式按钮与模型选择器
   之间挤不出空档）它会被直接省掉，而不是允许它压住控件。
@@ -583,6 +595,7 @@ plugin_manager → action: install_bundle → target: github:jryang1997/dsh-comp
 
 | 版本 | 这一版在解决什么 |
 |---|---|
+| [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | 工具行里一个可聚焦的麦克风按钮 —— 键盘入口终于变得找得到 |
 | [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | 设置页，以及它逼出来的那个配置模块 |
 | [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | 手势有了键盘等价操作；Host 出错时可以就地重试；失败会停下来等你处理，而不是一闪而过 |
 | [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | 录音不再接管输入框：悬浮胶囊、按下即有反馈、真正的退场，以及一套借自宿主的动效语汇 |

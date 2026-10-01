@@ -7,6 +7,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-01
+
+The keyboard entry from 1.2.0 was real but invisible: a chord cannot be found by pressing Tab.
+Now there is something to find.
+
+### Added
+
+- **A button in the composer's tool row**, to the left of the model selector —
+  `conversation.input.left` is an empty list slot inside that row, so what lands there is a real
+  flex child. Tab reaches it, Enter activates it, and `aria-keyshortcuts` is what tells a
+  keyboard user the chord exists at all. It is a **toggle** rather than a hold, because keeping
+  a key pressed with a button is awkward, and because that is what the shipped microphone does.
+- A small `session` store: the recording surface lives in one slot and the button in another,
+  with different owners, so the phase is published and the two commands are offered through it.
+  Deliberately not an event bus — one phase and three commands is the whole of what the two
+  seats need to say to each other.
+
+### Changed
+
+- **The known limitation is gone.** "The keyboard shortcut is documented, not advertised" was
+  accurate for one release; the button advertises it.
+- A new known limitation replaces it, and it is a real one: the composer hides
+  `conversation.input.left` while the shipped voice input's activity is expanded, so during an
+  official recording the chord is the only way in.
+
 ## [1.3.0] - 2026-10-01
 
 ### Added
@@ -139,7 +164,8 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.0.0...v1.1.0
