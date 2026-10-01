@@ -82,7 +82,7 @@ A git install is pinned to the commit it was installed from. To pin it to a rele
 — so you know exactly what you are running, and can move deliberately — name the tag:
 
 ```bash
-dsh plugin --profile <profile> add github:jryang1997/dsh-composer-dictation#v1.1.0
+dsh plugin --profile <profile> add github:jryang1997/dsh-composer-dictation#v1.2.0
 ```
 
 See [Releases](https://github.com/jryang1997/dsh-composer-dictation/releases) for what
@@ -122,7 +122,33 @@ activated.
 | Release | Transcript is inserted at the caret — **not** sent |
 | Press `Esc` while recording or transcribing | Cancel |
 | Hold, then drag up ≥48 px **or move the pointer off the box** | The capsule and the card's outline wash red and the word changes to "release to discard"; release there to drop it, come back to keep it |
+| **Hold `Ctrl`+`Shift`+`Space`**, then release | The same gesture with no mouse: hold the chord to record, let go to transcribe |
 | A plain click, a drag, or selecting text | Nothing happens — the arc retracts and the gesture never arms |
+
+### Keyboard
+
+`Ctrl`+`Shift`+`Space` is the whole gesture without a pointer: hold it down to record, let go
+to transcribe, `Esc` while still holding to discard. It works wherever you are in the app, so
+you do not have to focus the input box first, and it goes through exactly the same state
+machine as the mouse — the capsule, the waveform, the discard wash and the retained-transcript
+chip all behave identically.
+
+The chord is deliberately awkward to hit by accident, and it never claims a keystroke unless
+it actually starts a recording.
+
+### When something goes wrong
+
+A failure is not a toast. It stays on screen until you deal with it, because it is the only
+kind of message that is waiting for you, and it announces itself assertively rather than
+politely.
+
+| Failure | What the card offers |
+|---|---|
+| The Host could not transcribe — a network hiccup, a provider error, a model that fell over | **Retry**, which re-sends the recording you already made. You should not have to say the same sentence twice |
+| Anything the same recording would fail again on — too long, no recorder, models not prepared, microphone refused | Dismiss only, plus a line telling you what to change |
+
+`Dismiss` (or `Esc`) clears it. A recording that was simply too short is not a failure and
+still dissolves on its own.
 
 If the draft changed while recognition was running, the transcript is **kept** in a small
 lower-right chip; click it to insert at the current caret.
@@ -201,9 +227,10 @@ Interface-by-interface notes, verified against the shipped packages, live in
 
 ## Known limitations
 
-- **Pointer-only.** The long press is the only entry point; there is no keyboard equivalent
-  yet, so the feature is not reachable by keyboard alone. A focusable trigger is the obvious
-  next addition.
+- **The keyboard shortcut is documented, not advertised.** `Ctrl`+`Shift`+`Space` starts and
+  ends a recording and is the only way in without a pointer — but nothing in the interface
+  says so, because the plugin owns no control it could hang the hint on. A focusable trigger
+  would fix that properly, and the slot this plugin renders into does not offer one.
 - **Mouse-first.** Touch input is untested: on a touch screen a long press also drives text
   selection, so the thresholds would probably need tuning there.
 - **The hint needs room.** It lives in the tool row's empty middle, so on a very narrow
@@ -243,7 +270,7 @@ reinstall — there is no auto-update:
 
 ```text
 plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
-plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation#v1.1.0
+plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation#v1.2.0
 ```
 
 Removing first matters: re-installing over an existing row can report `ambiguous-install`,
@@ -260,6 +287,7 @@ be pinned to it. The short version:
 
 | Version | What it was about |
 |---|---|
+| [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | A keyboard equivalent for the gesture, retry in place when the Host hiccups, and failures that wait for an answer instead of flashing past |
 | [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | Recording stopped taking the composer over: a floating capsule, an acknowledged press, real exits, and a motion vocabulary borrowed from the host |
 | [1.0.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0) | The hold-to-talk gesture itself, and everything it needs to be safe to use |
 
@@ -360,6 +388,27 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 | 录音中或识别中按 `Esc` | 取消 |
 | 按住后上滑 ≥48 px，**或把鼠标移出输入框** | 胶囊与输入框外框一起泛红、文字变成「松开丢弃」；在那里松手即丢弃，移回来则保留 |
 | 单击、拖拽、拖选文字 | 什么都不发生 —— 进度环自己退回，手势不会激活 |
+| **按住 `Ctrl`+`Shift`+`空格`**，然后松开 | 同一套手势，只是不用鼠标：按住和弦开始录音，松开即转写 |
+
+### 键盘
+
+`Ctrl`+`Shift`+`空格` 就是没有指针的整套手势：按住录音，松开转写，按住时按 `Esc` 丢弃。
+它在你处于应用任何位置时都有效，不必先聚焦输入框；而且走的是**完全同一套状态机** ——
+胶囊、波形、丢弃红晕、保留转写的胶囊，行为完全一致。
+
+和弦刻意做得不容易误触，并且**只在真正开始录音时才拦截按键**。
+
+### 出错的时候
+
+失败不是一条一闪而过的提示。它会停在屏幕上直到你处理，因为只有这类消息是在等你回应，
+而且它用的是**主动播报**而不是礼貌播报。
+
+| 失败 | 卡片提供什么 |
+|---|---|
+| Host 转写失败 —— 网络抖动、provider 报错、模型挂了 | **重试**，把你**已经录好的那段**重新发一次。不该让你把同一句话说第二遍 |
+| 同一段录音再试也还是会失败 —— 太长、无录音能力、模型没准备、麦克风被拒 | 只有「关闭」，外加一行告诉你去改什么 |
+
+「关闭」或 `Esc` 清掉它。录得太短不算失败，仍会自己消散。
 
 **录音不会接管输入框。** 胶囊浮在卡片上方，卡片本身完全不动，所以你说的整段时间里草稿一直是
 可读、可编辑的。
@@ -434,8 +483,9 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 
 ## 已知限制
 
-- **只能用指针。** 长按是唯一入口，目前没有键盘等价操作，纯键盘用户无法触达。加一个可聚焦的
-  触发按钮是下一步最该做的事。
+- **键盘快捷键只写在文档里，没有在界面上宣传。** `Ctrl`+`Shift`+`空格` 能起停录音，也是无指针
+  用户唯一的入口 —— 但界面上没有任何地方说明它，因为这个插件没有任何一个它能挂提示的控件。
+  加一个可聚焦的触发按钮才是正经解法，而本插件所在的座位不提供这样的位置。
 - **以鼠标为主。** 触摸屏未验证：触摸长按同时会驱动文本选择，阈值大概需要另调。
 - **提示行需要空间。** 它待在工具行中间的空档里，所以输入框特别窄时（模式按钮与模型选择器
   之间挤不出空档）它会被直接省掉，而不是允许它压住控件。
@@ -470,7 +520,7 @@ git 安装是钉在安装时那个提交上的，没有自动更新，出新版�
 
 ```text
 plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
-plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation#v1.1.0
+plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation#v1.2.0
 ```
 
 **必须先 remove**：直接在原行上重装会报 `ambiguous-install`，因为依赖声明本身没有变化。
@@ -484,6 +534,7 @@ plugin_manager → action: install_bundle → target: github:jryang1997/dsh-comp
 
 | 版本 | 这一版在解决什么 |
 |---|---|
+| [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | 手势有了键盘等价操作；Host 出错时可以就地重试；失败会停下来等你处理，而不是一闪而过 |
 | [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | 录音不再接管输入框：悬浮胶囊、按下即有反馈、真正的退场，以及一套借自宿主的动效语汇 |
 | [1.0.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0) | 长按说话这个手势本身，以及让它安全可用所需的全部东西 |
 

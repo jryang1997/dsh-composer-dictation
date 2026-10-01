@@ -7,11 +7,35 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-01
+
+Making good on the three gaps the previous release left open: the gesture had no keyboard
+equivalent, a failure flashed past without offering a way out, and errors announced
+themselves as politely as a status update.
+
 ### Added
 
-- A 1280×640 link preview card (`docs/social-preview.png`) showing the capsule, the waveform
-  and the card left untouched underneath it. GitHub only picks it up once it is uploaded
-  under **Settings → Social preview**.
+- **A keyboard equivalent.** Hold `Ctrl`+`Shift`+`Space` to record and release to transcribe —
+  the same gesture, the same state machine, no pointer. The chord is deliberately awkward to
+  hit by accident and never claims a keystroke unless it actually starts a recording. It also
+  runs through the same discard path, so `Esc` while still holding discards.
+- **Retry, in place.** A failed transcription used to mean saying the whole sentence again.
+  The failure card now re-sends the recording that is already captured, so a network hiccup or
+  a provider error costs one click instead of one repetition.
+- **A 1280×640 link preview card** (`docs/social-preview.png`) showing the capsule, the
+  waveform and the card left untouched underneath it. GitHub only picks it up once it is
+  uploaded under **Settings → Social preview**.
+
+### Changed
+
+- **A failure is no longer a notice.** It stays on screen until it is dismissed or retried,
+  carries its own controls, clamps to two lines with the full text on hover, and uses
+  `role="alert"` so assistive technology treats it as urgent. The transient notice keeps
+  `role="status"`, because nothing is being asked of the user there.
+- **Saying nothing is no longer silent.** A recording shorter than `MIN_SECONDS` used to drop
+  out with no feedback at all, which a keyboard tap makes much easier to hit. It now says so.
+- A second entry point into `begin()` is guarded, so a hold and a chord can never race into
+  two captures.
 
 ## [1.1.0] - 2026-10-01
 
@@ -84,6 +108,7 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0
