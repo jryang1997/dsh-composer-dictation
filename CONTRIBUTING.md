@@ -56,3 +56,9 @@ Use the issue form — it asks for the two things that decide almost every repor
 speech provider is configured, and what the browser console says. Most "nothing happens"
 reports are the official voice-input bundle being disabled, which is by design: this plugin
 registers nothing when the speech service is absent rather than failing loudly.
+
+## Repo assets
+
+`docs/social-preview.png` (1280×640) is the link preview card. GitHub does not read it from
+the repository — it is uploaded once under **Settings → Social preview**, and re-uploaded
+when the design changes.
