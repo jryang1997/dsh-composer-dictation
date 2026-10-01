@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- A 1280×640 link preview card (`docs/social-preview.png`) showing the capsule, the waveform
+  and the card left untouched underneath it. GitHub only picks it up once it is uploaded
+  under **Settings → Social preview**.
+
 ## [1.1.0] - 2026-10-01
 
 Recording no longer takes the composer over, and the whole motion layer was rebuilt on
