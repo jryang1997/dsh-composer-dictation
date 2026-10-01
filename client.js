@@ -23,6 +23,8 @@ window.__ModuleLoader__.load({
 
 		const NS = 'dsh-composer-dictation';
 		const SLOT = 'conversation.input.overlay';
+		/** An empty list slot inside the composer's tool row — a real, focusable seat. */
+		const TOOL_SLOT = 'conversation.input.left';
 		const ENTRY = 'composer-dictation';
 
 		/**
@@ -234,6 +236,36 @@ window.__ModuleLoader__.load({
 
 		//#endregion
 
+		//#region session
+
+		/**
+		 * The one thing two components have to agree on.
+		 *
+		 * The recording surface lives in `conversation.input.overlay` and the tool-row button
+		 * lives in `conversation.input.left` — separate slots with separate owners, so neither
+		 * can pass the other a prop. The surface owns the state machine and publishes its phase;
+		 * the button subscribes and asks for commands through here.
+		 *
+		 * It is deliberately not a general event bus: one phase and three commands, because that
+		 * is the whole of what the two seats need to say to each other.
+		 */
+		const session = {
+			phase: 'idle',
+			commands: null,
+			listeners: new Set(),
+			publish(phase) {
+				if (this.phase === phase) return;
+				this.phase = phase;
+				for (const listener of this.listeners) listener(phase);
+			},
+			subscribe(listener) {
+				this.listeners.add(listener);
+				return () => this.listeners.delete(listener);
+			},
+		};
+
+		//#endregion
+
 		/** Handles captured in `apply`, so a slot entry that receives no injected props still works. */
 		const runtime = { speech: null, limits: null };
 
@@ -274,6 +306,9 @@ window.__ModuleLoader__.load({
 			chordOff: '关闭',
 			settingsReset: '恢复默认',
 			settingsLocal: '单位：毫秒',
+			btnStart: '语音输入',
+			btnStop: '结束并转写',
+			btnWorking: '识别中',
 		};
 		const en = {
 			hint: 'Hold to dictate · swipe up to cancel',
@@ -312,6 +347,9 @@ window.__ModuleLoader__.load({
 			chordOff: 'Off',
 			settingsReset: 'Restore defaults',
 			settingsLocal: 'milliseconds',
+			btnStart: 'Dictate',
+			btnStop: 'Finish and transcribe',
+			btnWorking: 'Transcribing',
 		};
 
 		/**
@@ -1141,6 +1179,98 @@ window.__ModuleLoader__.load({
 
 		//#endregion
 
+		//#region tool-row button
+
+		/**
+		 * The focusable way in.
+		 *
+		 * A long press is invisible and a chord is invisible; neither can be found by pressing
+		 * Tab. `conversation.input.left` is a list slot inside the composer's tool row and it is
+		 * empty, so what is registered there is a real flex child of that row — Tab reaches it,
+		 * a screen reader announces it, and `aria-keyshortcuts` is what tells a user the chord
+		 * exists at all.
+		 *
+		 * Its model is a toggle rather than a hold, because asking someone to keep a key pressed
+		 * with a button is awkward, and because that is what the shipped microphone does.
+		 */
+		const BUTTON_STYLES = `
+@keyframes dsh-htt-breathe{from{opacity:.35}to{opacity:1}}
+.dsh-htt-toolwrap{display:contents}
+.dsh-htt-tool{
+  box-sizing:border-box; flex:none; display:grid; place-items:center;
+  width:28px; height:28px; padding:0;
+  border:1px solid transparent; border-radius:var(--dsw-radius-sm);
+  background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer;
+  transition:background-color 140ms linear, color 140ms linear;
+}
+.dsh-htt-tool:hover:not(:disabled){
+  background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary);
+}
+.dsh-htt-tool:disabled{opacity:.5; cursor:default}
+.dsh-htt-tool[data-state=recording]{
+  background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent);
+  border-color:var(--dsw-alias-state-error-primary);
+  color:var(--dsw-alias-state-error-primary);
+}
+.dsh-htt-tool:focus-visible{
+  outline-style:solid; outline-width:2px; outline-offset:2px;
+  outline-color:var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+}
+.dsh-htt-tool-live{
+  width:7px; height:7px; border-radius:50%;
+  background:currentColor; animation:dsh-htt-breathe 1.4s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion:reduce){.dsh-htt-tool-live{animation:none}}
+`;
+
+		function DictationButton(props) {
+			const [phase, setPhase] = React.useState(session.phase);
+			React.useEffect(() => session.subscribe(setPhase), []);
+			const [settings, setSettings] = React.useState(() => config.all());
+			React.useEffect(() => config.subscribe(() => setSettings(config.all())), []);
+
+			const recording = phase === 'recording';
+			const working = phase === 'transcribing';
+			const label = working
+				? translate(props, 'btnWorking')
+				: recording ? translate(props, 'btnStop') : translate(props, 'btnStart');
+			const chord = settings.chord;
+
+			return h(
+				'span',
+				{ className: 'dsh-htt-toolwrap' },
+				h('style', null, BUTTON_STYLES),
+				h(
+					'button',
+					{
+						type: 'button',
+						className: 'dsh-htt-tool',
+						'data-state': recording ? 'recording' : 'idle',
+						'aria-label': label,
+						'aria-pressed': recording ? 'true' : 'false',
+						// Announcing the chord here is the only place a keyboard user can learn it.
+						'aria-keyshortcuts': chord === 'off' ? undefined : chord,
+						title: label,
+						disabled: working,
+						// Keep the caret where it was: the transcript lands at the editor's own
+						// selection, and stealing focus would move it.
+						onMouseDown: (event) => event.preventDefault(),
+						onClick: () => {
+							const commands = session.commands;
+							if (commands === null) return;
+							if (recording) commands.finish();
+							else if (!working) commands.start();
+						},
+					},
+					recording
+						? h('span', { className: 'dsh-htt-tool-live', 'aria-hidden': true })
+						: h(MicGlyph, { size: 15 }),
+				),
+			);
+		}
+
+		//#endregion
+
 		//#region component
 
 		/** Prefer the entry's injected `transcribe`; fall back to the Remote captured at activation. */
@@ -1180,6 +1310,11 @@ window.__ModuleLoader__.load({
 			 */
 			const [settings, setSettings] = React.useState(() => config.all());
 			React.useEffect(() => config.subscribe(() => setSettings(config.all())), []);
+			// The tool-row button owns no state of its own: the surface publishes its phase here
+			// and offers the button its commands through `session`.
+			React.useEffect(() => {
+				session.publish(view.phase);
+			}, [view.phase]);
 			// Notices live and die on timers owned by the setup effect below, so that the exit
 			// animation can run before the element unmounts. A React effect cannot do this:
 			// its dependency on `view` would restart the countdown the moment it re-renders.
@@ -1932,6 +2067,14 @@ window.__ModuleLoader__.load({
 					if (state.active) cancel(true);
 				};
 
+				// The tool-row button cannot reach into this closure, so the surface hands it the
+				// two commands it needs. Cleared on unmount, which is what disables the button.
+				session.commands = {
+					start: () => { if (!state.active && !state.busy) void begin(); },
+					finish: () => { if (state.active) void finish(); },
+					cancel: () => cancel(false),
+				};
+
 				card.addEventListener('pointerdown', onPointerDown, true);
 				card.addEventListener('pointerenter', onEnter);
 				card.addEventListener('pointerleave', onLeave);
@@ -1965,6 +2108,7 @@ window.__ModuleLoader__.load({
 					detach();
 					state.keyboard = false;
 					state.retry = null;
+					session.commands = null;
 					state.run += 1;
 					if (state.abort !== null) state.abort.abort();
 					if (state.capture !== null) state.capture.dispose();
@@ -2212,6 +2356,12 @@ window.__ModuleLoader__.load({
 				scope.effect(() => scope.slots.inject(CONFIG_SLOT, () => scope.slots.register(
 					{ name: CONFIG_SLOT, key: PKG, locale: NS },
 					SettingsPage,
+				)));
+				// And the focusable way in: an empty list slot inside the composer's tool row,
+				// so what lands there is a real flex child that Tab can reach.
+				scope.effect(() => scope.slots.inject(TOOL_SLOT, () => scope.slots.register(
+					{ name: TOOL_SLOT, id: ENTRY, order: 50, locale: NS },
+					DictationButton,
 				)));
 			});
 			// `remote.speech` is mounted by the experimental voice-input plugin; if that
