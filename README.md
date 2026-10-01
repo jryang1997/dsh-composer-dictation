@@ -10,6 +10,11 @@
 Long-press anywhere on the composer card in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) to dictate.
 Release to transcribe and drop the text into the draft. Nothing is sent automatically.
 
+![Hover to see the hint, press and hold to draw the ring, record in the capsule above the card, release to insert the text](docs/gesture.gif)
+
+*The whole gesture — captured from the plugin's own component rendering against the host's own
+stylesheet, not a mock-up.*
+
 ```
 ┌──────────────────────────────────────────────────────┐
 │                                                      │
@@ -32,6 +37,26 @@ Release to transcribe and drop the text into the draft. Nothing is sent automati
 Recording does **not** take the composer over. The bubble is a floating capsule above the
 card, and the card is left alone, so you can keep reading and editing your draft while you
 dictate.
+
+### What it looks like
+
+The hint parks in the tool row. It carries no colours of its own, so it reads the host's tokens
+and follows light and dark without being told:
+
+| Light | Dark |
+|---|---|
+| ![The hover hint in the light theme](docs/composer-light.png) | ![The hover hint in the dark theme](docs/composer-dark.png) |
+
+While recording, the capsule floats above the card. The card keeps its border, its background and
+its draft, because nothing is written outside the plugin's own layer:
+
+![The recording capsule, floating above an untouched composer](docs/recording.png)
+
+Five settings, under **Settings → Plugins → Hold to talk**:
+
+| Light | Dark |
+|---|---|
+| ![The settings page in the light theme](docs/settings-light.png) | ![The settings page in the dark theme](docs/settings-dark.png) |
 
 ---
 
@@ -362,6 +387,28 @@ bundle is safe. A git install (route A) lives inside the profile and needs no cl
 
 **按住鼠标说话**：在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的输入框里长按鼠标即可语音输入，松开后转写并插入草稿，
 **不会自动发送**。
+
+![悬停出现提示、按住画出进度环、在卡片上方录音、松开插入文字](docs/gesture.gif)
+
+*整套手势 —— 由插件自己的组件在宿主自己的样式表下渲染后抓取，不是效果图。*
+
+### 它长什么样
+
+提示行停在工具行里。它一个颜色都不自带，所以读宿主的令牌、自己跟着明暗切换：
+
+| 亮色 | 暗色 |
+|---|---|
+| ![亮色主题下的悬停提示](docs/composer-light.png) | ![暗色主题下的悬停提示](docs/composer-dark.png) |
+
+录音时，胶囊浮在卡片上方。卡片保留自己的边框、背景和草稿 —— 因为插件只写自己那一层：
+
+![浮在未被触碰的输入框上方的录音胶囊](docs/recording.png)
+
+五个设置项，在「**设置 → 插件 → 按住说话**」里：
+
+| 亮色 | 暗色 |
+|---|---|
+| ![亮色主题下的设置页](docs/settings-light.png) | ![暗色主题下的设置页](docs/settings-dark.png) |
 
 ## 前置依赖（先读这一节）
 
