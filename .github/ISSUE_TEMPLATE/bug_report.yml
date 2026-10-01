@@ -37,7 +37,7 @@ body:
     attributes:
       label: Browser console output
       description: Open the developer console before reproducing. Paste any errors verbatim —
-        `dsh-composer-dictation: [data-composer-card] not found` in particular tells us the
+        `dsh-hold-to-dictate: [data-composer-card] not found` in particular tells us the
         composer layout changed.
       render: text
     validations:

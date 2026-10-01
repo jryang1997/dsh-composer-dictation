@@ -1,7 +1,7 @@
 /**
  * Hold-to-talk — long-press anywhere on the composer card to dictate.
  *
- * Client half of @jryang1997/dsh-composer-dictation. It mounts one entry into
+ * Client half of @jryang1997/dsh-hold-to-dictate. It mounts one entry into
  * `conversation.input.overlay` (a list slot rendered inside the resident composer
  * card), walks up from its own node to `[data-composer-card]`, and watches pointer
  * events on that card in the capture phase.
@@ -16,14 +16,14 @@
  * `pointer-events: none` until a recording is actually running.
  */
 window.__ModuleLoader__.load({
-	id: '@jryang1997/dsh-composer-dictation',
+	id: '@jryang1997/dsh-hold-to-dictate',
 	factory(require) {
 		const React = require('react');
 		const h = React.createElement;
 
-		const NS = 'dsh-composer-dictation';
+		const NS = 'dsh-hold-to-dictate';
 		const SLOT = 'conversation.input.overlay';
-		const ENTRY = 'composer-dictation';
+		const ENTRY = 'hold-to-dictate';
 
 		/**
 		 * How long the pointer must stay still before the composer becomes a microphone. The
@@ -92,7 +92,13 @@ window.__ModuleLoader__.load({
 		 * the entire bundle, silently, with nothing on screen to say why), and these are
 		 * per-machine preferences rather than configuration that should travel with a profile.
 		 */
-		const PKG = '@jryang1997/dsh-composer-dictation';
+		const PKG = '@jryang1997/dsh-hold-to-dictate';
+		/*
+		 * Deliberately still the *old* package name, and deliberately left alone by the 2.0.0
+		 * rename. This string is a storage key, not an identity: it is what the browser has
+		 * already written the user's settings under. Renaming it to match the package would
+		 * silently discard every setting anyone had tuned, in exchange for nothing.
+		 */
 		const CONFIG_KEY = 'dsh-composer-dictation.config';
 		const CONFIG_SLOT = 'plugins.bundle.config';
 
@@ -1239,7 +1245,7 @@ window.__ModuleLoader__.load({
 				if (node === null) return undefined;
 				const card = node.closest('[data-composer-card]');
 				if (card === null) {
-					console.warn('dsh-composer-dictation: [data-composer-card] not found; the composer layout changed');
+					console.warn('dsh-hold-to-dictate: [data-composer-card] not found; the composer layout changed');
 					return undefined;
 				}
 

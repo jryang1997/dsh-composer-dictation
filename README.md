@@ -1,8 +1,8 @@
-# dsh-composer-dictation
+# dsh-hold-to-dictate
 
-[![check](https://github.com/jryang1997/dsh-composer-dictation/actions/workflows/check.yml/badge.svg)](https://github.com/jryang1997/dsh-composer-dictation/actions/workflows/check.yml)
-[![release](https://img.shields.io/github/v/release/jryang1997/dsh-composer-dictation)](https://github.com/jryang1997/dsh-composer-dictation/releases)
-[![license](https://img.shields.io/github/license/jryang1997/dsh-composer-dictation)](LICENSE)
+[![check](https://github.com/jryang1997/dsh-hold-to-dictate/actions/workflows/check.yml/badge.svg)](https://github.com/jryang1997/dsh-hold-to-dictate/actions/workflows/check.yml)
+[![release](https://img.shields.io/github/v/release/jryang1997/dsh-hold-to-dictate)](https://github.com/jryang1997/dsh-hold-to-dictate/releases)
+[![license](https://img.shields.io/github/license/jryang1997/dsh-hold-to-dictate)](LICENSE)
 [![topic](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
 
 **English** · [中文](#中文)
@@ -70,22 +70,22 @@ The plugin manager accepts a git URL as an install target, so the whole install 
 command. From the CLI:
 
 ```bash
-dsh plugin --profile <profile> add github:jryang1997/dsh-composer-dictation
+dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-dictate
 ```
 
 or ask the agent in any session:
 
-> Install the bundle `github:jryang1997/dsh-composer-dictation` with `plugin_manager`
+> Install the bundle `github:jryang1997/dsh-hold-to-dictate` with `plugin_manager`
 > (`action: install_bundle`).
 
 A git install is pinned to the commit it was installed from. To pin it to a release instead
 — so you know exactly what you are running, and can move deliberately — name the tag:
 
 ```bash
-dsh plugin --profile <profile> add github:jryang1997/dsh-composer-dictation#v1.2.0
+dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-dictate#v1.2.0
 ```
 
-See [Releases](https://github.com/jryang1997/dsh-composer-dictation/releases) for what
+See [Releases](https://github.com/jryang1997/dsh-hold-to-dictate/releases) for what
 changed in each one, and [`CHANGELOG.md`](CHANGELOG.md) for the detail.
 
 **B. Install from a clone**
@@ -94,7 +94,7 @@ Cloning first also works, and is the route to take when you want to modify the p
 locally:
 
 ```bash
-git clone https://github.com/jryang1997/dsh-composer-dictation.git
+git clone https://github.com/jryang1997/dsh-hold-to-dictate.git
 ```
 
 Then install the directory: ask the agent to run `plugin_manager`
@@ -306,8 +306,8 @@ A git install is pinned to the commit it was installed from, so a new release ne
 reinstall — there is no auto-update:
 
 ```text
-plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
-plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation#v1.2.0
+plugin_manager → action: remove_bundle → target: @jryang1997/dsh-hold-to-dictate
+plugin_manager → action: install_bundle → target: github:jryang1997/dsh-hold-to-dictate#v1.2.0
 ```
 
 Removing first matters: re-installing over an existing row can report `ambiguous-install`,
@@ -324,19 +324,19 @@ be pinned to it. The short version:
 
 | Version | What it was about |
 |---|---|
-| [1.5.2](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.2) | The hover hint was aligned to a rule nothing renders; the real model selector is one weight lighter, and the row's asymmetric padding put the hint 2 px low |
-| [1.5.1](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.1) | A correction: the duplicate microphone from 1.4.0 is gone, and the glyph is the host's own |
-| [1.5.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.0) | A separate hold for a finger, and suppression of the word selection and native menu a long press otherwise triggers — the host does nothing about touch at all |
-| [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | A focusable microphone button in the tool row — the keyboard entry finally becomes findable |
-| [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | A settings page, and the configuration module it forced into existence |
-| [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | A keyboard equivalent for the gesture, retry in place when the Host hiccups, and failures that wait for an answer instead of flashing past |
-| [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | Recording stopped taking the composer over: a floating capsule, an acknowledged press, real exits, and a motion vocabulary borrowed from the host |
-| [1.0.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0) | The hold-to-talk gesture itself, and everything it needs to be safe to use |
+| [1.5.2](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.5.2) | The hover hint was aligned to a rule nothing renders; the real model selector is one weight lighter, and the row's asymmetric padding put the hint 2 px low |
+| [1.5.1](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.5.1) | A correction: the duplicate microphone from 1.4.0 is gone, and the glyph is the host's own |
+| [1.5.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.5.0) | A separate hold for a finger, and suppression of the word selection and native menu a long press otherwise triggers — the host does nothing about touch at all |
+| [1.4.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.4.0) | A focusable microphone button in the tool row — the keyboard entry finally becomes findable |
+| [1.3.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.3.0) | A settings page, and the configuration module it forced into existence |
+| [1.2.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.2.0) | A keyboard equivalent for the gesture, retry in place when the Host hiccups, and failures that wait for an answer instead of flashing past |
+| [1.1.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.1.0) | Recording stopped taking the composer over: a floating capsule, an acknowledged press, real exits, and a motion vocabulary borrowed from the host |
+| [1.0.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.0.0) | The hold-to-talk gesture itself, and everything it needs to be safe to use |
 
 ## Uninstall
 
 ```text
-plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
+plugin_manager → action: remove_bundle → target: @jryang1997/dsh-hold-to-dictate
 ```
 
 A directory install (route B) links to the clone, so deleting the clone after removing the
@@ -391,19 +391,19 @@ bundle is safe. A git install (route A) lives inside the profile and needs no cl
 插件管理器接受 git 地址作为安装目标，整条命令就能装完。命令行：
 
 ```bash
-dsh plugin --profile <profile> add github:jryang1997/dsh-composer-dictation
+dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-dictate
 ```
 
 或在任意会话里对 Agent 说：
 
-> 用 `plugin_manager`（`action: install_bundle`）安装 `github:jryang1997/dsh-composer-dictation` 这个 bundle。
+> 用 `plugin_manager`（`action: install_bundle`）安装 `github:jryang1997/dsh-hold-to-dictate` 这个 bundle。
 
 **方式 B：从克隆安装**
 
 先克隆再装目录也可以，想改本地代码时用这条路：
 
 ```bash
-git clone https://github.com/jryang1997/dsh-composer-dictation.git
+git clone https://github.com/jryang1997/dsh-hold-to-dictate.git
 ```
 
 然后安装目录：让 Agent 执行 `plugin_manager`（`action: install_bundle`，`target` 填克隆目录的
@@ -584,7 +584,7 @@ DeepSeek Harness **没有官方插件市场，也没有投稿流程**：官方�
 `install_bundle` 也接受 npm 包名，所以发布到 npm 之后，用户可以直接用包名安装、不必走 git：
 
 ```text
-plugin_manager → action: install_bundle → target: @jryang1997/dsh-composer-dictation
+plugin_manager → action: install_bundle → target: @jryang1997/dsh-hold-to-dictate
 ```
 
 ## 更新
@@ -592,8 +592,8 @@ plugin_manager → action: install_bundle → target: @jryang1997/dsh-composer-d
 git 安装是钉在安装时那个提交上的，没有自动更新，出新版本要重装一次：
 
 ```text
-plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
-plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation#v1.2.0
+plugin_manager → action: remove_bundle → target: @jryang1997/dsh-hold-to-dictate
+plugin_manager → action: install_bundle → target: github:jryang1997/dsh-hold-to-dictate#v1.2.0
 ```
 
 **必须先 remove**：直接在原行上重装会报 `ambiguous-install`，因为依赖声明本身没有变化。
@@ -607,19 +607,19 @@ plugin_manager → action: install_bundle → target: github:jryang1997/dsh-comp
 
 | 版本 | 这一版在解决什么 |
 |---|---|
-| [1.5.2](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.2) | 提示行之前对齐到了一条没人渲染的规则；真正的模型选择器轻一档，而行内的不对称 padding 让提示行低了 2px |
-| [1.5.1](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.1) | 一次纠正：1.4.0 那个重复的麦克风拆掉了，图标换成宿主自己的 |
-| [1.5.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.0) | 手指有自己的一套阈值，并且拦掉长按本来会触发的选词与原生菜单 —— 宿主对触摸完全不管 |
-| [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | 工具行里一个可聚焦的麦克风按钮 —— 键盘入口终于变得找得到 |
-| [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | 设置页，以及它逼出来的那个配置模块 |
-| [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | 手势有了键盘等价操作；Host 出错时可以就地重试；失败会停下来等你处理，而不是一闪而过 |
-| [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | 录音不再接管输入框：悬浮胶囊、按下即有反馈、真正的退场，以及一套借自宿主的动效语汇 |
-| [1.0.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0) | 长按说话这个手势本身，以及让它安全可用所需的全部东西 |
+| [1.5.2](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.5.2) | 提示行之前对齐到了一条没人渲染的规则；真正的模型选择器轻一档，而行内的不对称 padding 让提示行低了 2px |
+| [1.5.1](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.5.1) | 一次纠正：1.4.0 那个重复的麦克风拆掉了，图标换成宿主自己的 |
+| [1.5.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.5.0) | 手指有自己的一套阈值，并且拦掉长按本来会触发的选词与原生菜单 —— 宿主对触摸完全不管 |
+| [1.4.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.4.0) | 工具行里一个可聚焦的麦克风按钮 —— 键盘入口终于变得找得到 |
+| [1.3.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.3.0) | 设置页，以及它逼出来的那个配置模块 |
+| [1.2.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.2.0) | 手势有了键盘等价操作；Host 出错时可以就地重试；失败会停下来等你处理，而不是一闪而过 |
+| [1.1.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.1.0) | 录音不再接管输入框：悬浮胶囊、按下即有反馈、真正的退场，以及一套借自宿主的动效语汇 |
+| [1.0.0](https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.0.0) | 长按说话这个手势本身，以及让它安全可用所需的全部东西 |
 
 ## 卸载
 
 ```text
-plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
+plugin_manager → action: remove_bundle → target: @jryang1997/dsh-hold-to-dictate
 ```
 
 方式 B（目录安装）是以链接方式装的，卸载后删掉克隆目录即可；方式 A（git 安装）装在

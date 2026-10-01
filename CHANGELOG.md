@@ -7,6 +7,53 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-01
+
+The name changed. Nothing about what the plugin does changed with it — this is a major version
+because the **install identity** did, and every existing install has to be redone.
+
+### Changed
+
+- **`dsh-composer-dictation` is now `dsh-hold-to-dictate`.** The old name had two problems.
+  "Composer" is DeepSeek Harness's own word for the input box, but to anyone scanning GitHub it
+  is also PHP's package manager and several other things; and "dictation" on its own says what
+  the plugin does without saying how you invoke it. The new name carries both: the gesture and
+  the result. The bundle row, client module id, locale namespace and slot entry id follow it.
+- The display name in the plugin list is unchanged: **Hold to talk** / **按住说话**. The package
+  name is what GitHub and `dsh plugin add` see; the title is what you read in Settings.
+
+### Not changed, deliberately
+
+- **The settings storage key stays `dsh-composer-dictation.config`.** It is a storage key, not
+  an identity: it is what the browser has already written your settings under. Renaming it to
+  match the package would silently discard every value anyone had tuned and buy nothing. There
+  is a comment in `client.js` saying so, because it otherwise reads as an oversight.
+- **The `dsh-htt-` CSS prefix.** `htt` stood for the project's first name, but it is an opaque
+  namespace no user ever sees, and this changelog's own history refers to `.dsh-htt-tool`.
+  Renaming it would have buried the real change under 279 lines of mechanical diff.
+
+### Upgrading
+
+```sh
+dsh plugin remove @jryang1997/dsh-composer-dictation
+dsh plugin add github:jryang1997/dsh-hold-to-dictate
+```
+
+Your settings survive the move. That is what the unchanged storage key buys.
+
+### Why not `hold-to-talk`
+
+It was the obvious name, and it was taken twice over:
+
+| Where | Who |
+|---|---|
+| npm | `dsh-hold-to-talk` belongs to a different plugin (latest `0.1.3`) |
+| GitHub | `wangzhanchao883/dsh-hold-to-talk` and `Gammonmush803/dsh-hold-to-talk` |
+
+Both are hold-to-talk dictation plugins for the same harness. A third repository carrying that
+slug would have been the least visible of the three, and would have read as a copy of the first.
+`dsh-hold-to-dictate` was clear on both npm and GitHub when it was chosen.
+
 ## [1.5.2] - 2026-10-01
 
 1.5.1 aligned the hover hint to a CSS rule that turned out not to be rendered by anything.
@@ -244,12 +291,13 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.2...HEAD
-[1.5.2]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.1...v1.5.2
-[1.5.1]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.0...v1.5.1
-[1.5.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.4.0...v1.5.0
-[1.4.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.3.0...v1.4.0
-[1.3.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0
+[Unreleased]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.5.2...v2.0.0
+[1.5.2]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.5.1...v1.5.2
+[1.5.1]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/jryang1997/dsh-hold-to-dictate/releases/tag/v1.0.0

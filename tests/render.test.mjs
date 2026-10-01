@@ -92,7 +92,7 @@ new Function('window', 'document', 'navigator', 'AudioContext', 'OfflineAudioCon
 );
 
 check(loaded !== null, 'client.js registers itself with the module loader');
-check(loaded?.id === '@jryang1997/dsh-composer-dictation', 'bundle id still matches package.json');
+check(loaded?.id === '@jryang1997/dsh-hold-to-dictate', 'bundle id still matches package.json');
 
 //#endregion
 
@@ -488,9 +488,9 @@ const mountSettings = () => {
 
 const settingsEntry = registrations.get('plugins.bundle.config');
 check(settingsEntry !== undefined, 'the bundle registers a settings page');
-check(settingsEntry?.meta.key === '@jryang1997/dsh-composer-dictation',
+check(settingsEntry?.meta.key === '@jryang1997/dsh-hold-to-dictate',
 	'the page is keyed by package name, which is what the manager passes down as entryKey');
-check(settingsEntry?.meta.locale === 'dsh-composer-dictation', 'the page carries its locale namespace');
+check(settingsEntry?.meta.locale === 'dsh-hold-to-dictate', 'the page carries its locale namespace');
 
 let page = mountSettings();
 check(classes(page).includes('dsh-htt-set'), 'the settings page renders');
