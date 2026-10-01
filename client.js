@@ -33,7 +33,9 @@ window.__ModuleLoader__.load({
 		/** Movement beyond this disarms the gesture: it was a click, a caret move or a selection. */
 		const ARM_TOLERANCE_PX = 10;
 		/** A finger is not a mouse: it rolls, and it never stays within ten pixels. */
-		const TOUCH_TOLERANCE_PX = 16;		/** Upward travel that arms "release to discard". Leaving the card arms it too. */
+		const TOUCH_TOLERANCE_PX = 16;
+		/** The hint's own box, shared by its stylesheet rule and its measured position. */
+		const HINT_HEIGHT = 20;		/** Upward travel that arms "release to discard". Leaving the card arms it too. */
 		const CANCEL_ARM_PX = 48;
 		/**
 		 * The disarm threshold, deliberately 10 px *below* the arm threshold. A single
@@ -577,13 +579,17 @@ window.__ModuleLoader__.load({
 
 /* ---- hover hint: parked in the tool row, never over the draft ---------- */
 .dsh-htt-hint{
-  position:absolute; display:flex; align-items:center; gap:6px; height:20px;
+  position:absolute; display:flex; align-items:center; gap:6px; height:${HINT_HEIGHT}px;
   /*
-   * The tool row has one typographic voice and this has to join it: the host's own model
-   * selector is 13px / 500 / 20px with no tracking (its RlGAzG_select rule), so the hint
-   * matches that exactly. Anything else reads as a foreign element that happens to be nearby.
+   * The tool row has one typographic voice and this has to join it. The host's model selector
+   * — the ModelSelect trigger, the control this sits beside — is 13px / 400 / 20px with normal
+   * tracking and label-secondary; everything here matches it.
+   *
+   * Not to be confused with the InputBar stylesheet's select rule, which is 13px / 500 and is
+   * dead CSS: nothing in the host renders it. Its live twin is the permission chip, whose 500
+   * weight belongs to a chip, not to body text.
    */
-  font-size:13px; font-weight:500; line-height:20px;
+  font-size:13px; font-weight:400; line-height:20px;
   color:var(--dsw-alias-label-secondary);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   user-select:none; pointer-events:none;
@@ -887,10 +893,15 @@ window.__ModuleLoader__.load({
 		 * the gap in front of the tool row's trailing group, and `hintMax` is that gap. When
 		 * the row is too narrow for the whole line it truncates rather than overlapping a
 		 * control, and below 48 px of room it is not rendered at all.
+		 *
+		 * Vertically it is centred on the trailing group's own box rather than on the row, so
+		 * it lines up with the model selector beside it whatever the row's padding happens to be.
 		 */
 		const hintStyle = (box) => ({
 			right: `${box.hintRight}px`,
-			bottom: `${Math.max(4, (box.rowHeight - 20) / 2)}px`,
+			...(box.hintCentre === null || box.hintCentre === undefined
+				? { bottom: `${Math.max(4, (box.rowHeight - HINT_HEIGHT) / 2)}px` }
+				: { top: `${box.hintCentre - HINT_HEIGHT / 2}px` }),
 			maxWidth: `${box.hintMax}px`,
 		});
 
@@ -1264,6 +1275,7 @@ window.__ModuleLoader__.load({
 					let rowHeight = 0;
 					let hintRight = 14;
 					let hintMax = 0;
+					let hintCentre = null;
 					if (row !== null) {
 						const rowRect = row.getBoundingClientRect();
 						rowHeight = rowRect.height;
@@ -1274,9 +1286,18 @@ window.__ModuleLoader__.load({
 							const leading = boxes.filter((child) => child.right <= trailing.left - 12).pop();
 							const floor = leading === undefined ? rect.left + 12 : leading.right + 12;
 							hintMax = Math.max(0, trailing.left - 12 - floor);
+							/*
+							 * Vertical alignment is measured off the control the hint sits beside,
+							 * not off the row's box. The row is `padding: 2px 8px 6px` — asymmetric —
+							 * so a box-centred hint lands 2 px lower than every control around it.
+							 * That is small enough to read as "something is off" and too small to
+							 * name, which is exactly the kind of thing that should be derived
+							 * rather than guessed at.
+							 */
+							hintCentre = trailing.top + trailing.height / 2 - rect.top;
 						}
 					}
-					setBox({ height: rect.height, rowHeight, hintRight, hintMax });
+					setBox({ height: rect.height, rowHeight, hintRight, hintMax, hintCentre });
 				};
 				measure();
 				const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
