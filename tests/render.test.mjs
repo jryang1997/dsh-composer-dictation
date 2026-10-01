@@ -519,6 +519,61 @@ check(inputActions.captured === 1, 'and so does the chord');
 
 //#endregion
 
+//#region the tool-row button
+
+/**
+ * Mount the button without clearing cleanups: the surface has to stay mounted, because it is
+ * what publishes the phase and hands the button its commands.
+ */
+const mountButton = () => {
+	preset = [];
+	hookIndex = 0;
+	refQueue = [];
+	const entry = registrations.get('conversation.input.left');
+	return entry === undefined ? null : entry.component({ t: undefined });
+};
+
+const toolEntry = registrations.get('conversation.input.left');
+check(toolEntry !== undefined, 'the bundle registers a tool-row button');
+check(typeof toolEntry?.meta.id === 'string' && toolEntry.meta.id !== '',
+	'as a fresh id in a list slot, so it joins the row instead of replacing anything');
+check(toolEntry?.meta.locale === 'dsh-composer-dictation', 'and carries its locale namespace');
+
+render(true, IDLE);
+let button = find(mountButton(), 'dsh-htt-tool');
+check(button !== undefined, 'the button renders');
+check(button.type === 'button', 'as a real button, so Tab reaches it and Enter activates it');
+check(button.props['aria-label'] === '语音输入', 'idle says what pressing it will do');
+check(button.props['aria-pressed'] === 'false', 'and reports that it is not pressed');
+check(button.props['aria-keyshortcuts'] === 'Control+Shift+Space',
+	'and announces the chord, which is the only place a keyboard user can learn it');
+check(button.props.disabled !== true, 'and is enabled');
+
+inputActions.captured = 0;
+button.props.onClick();
+check(inputActions.captured === 1, 'pressing it starts a capture');
+
+render(true, { ...IDLE, phase: 'recording' });
+button = find(mountButton(), 'dsh-htt-tool');
+check(button.props['data-state'] === 'recording', 'recording shows on the button');
+check(button.props['aria-pressed'] === 'true', 'and is announced as pressed');
+check(find(button, 'dsh-htt-tool-live') !== null, 'and the microphone becomes a live dot');
+
+render(true, { ...IDLE, phase: 'transcribing' });
+button = find(mountButton(), 'dsh-htt-tool');
+check(button.props.disabled === true, 'transcribing disables it rather than offering a no-op');
+
+// With no chord configured there is nothing to announce.
+page = mountSettings();
+chooseIn('chord', '关闭');
+render(true, IDLE);
+button = find(mountButton(), 'dsh-htt-tool');
+check(button.props['aria-keyshortcuts'] === undefined, 'no chord means no announcement');
+page = mountSettings();
+find(page, 'dsh-htt-set-reset').props.onClick();
+
+//#endregion
+
 //#region the injected stylesheet
 
 const css = styleText(render(true, IDLE));
@@ -583,6 +638,16 @@ check(typeof settingsCss === 'string' && settingsCss.includes('.dsh-htt-set-row'
 check(count(settingsCss, '{') === count(settingsCss, '}'), 'settings stylesheet braces balance');
 check(rule(settingsCss, '.dsh-htt-set-number:focus-visible').includes('outline-style:solid'),
 	'the settings controls take keyboard focus visibly');
+
+// The button lives in the tool row, so it brings its own stylesheet too.
+const buttonCss = styleText(mountButton());
+check(typeof buttonCss === 'string' && buttonCss.includes('.dsh-htt-tool'),
+	'the button injects its own styles');
+check(count(buttonCss, '{') === count(buttonCss, '}'), 'button stylesheet braces balance');
+check(rule(buttonCss, '.dsh-htt-tool:focus-visible').includes('outline-style:solid'),
+	'the button shows keyboard focus');
+check(buttonCss.includes('.dsh-htt-toolwrap{display:contents}'),
+	'the wrapper stays out of the tool row layout');
 
 //#endregion
 
