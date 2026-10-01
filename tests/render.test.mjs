@@ -123,7 +123,8 @@ const React = {
 	useState: (value) => {
 		const given = preset[hookIndex];
 		hookIndex += 1;
-		return [given === undefined ? value : given, () => undefined];
+		const initial = typeof value === 'function' ? value() : value;
+		return [given === undefined ? initial : given, () => undefined];
 	},
 	useEffect: (fn) => {
 		const cleanup = fn();
@@ -136,12 +137,17 @@ const React = {
 //#region capture the component through a stubbed apply
 
 let component = null;
+/** Every slot the bundle registers into, by slot name. */
+const registrations = new Map();
 const scope = {
 	effect: (fn) => { fn(); },
 	remote: { speech: { catalog: async () => ({ ok: false }), transcribe: async () => ({ ok: false }) } },
 	slots: {
 		inject: (_name, fn) => fn(),
-		register: (_meta, registered) => { component = registered; },
+		register: (meta, registered) => {
+			registrations.set(meta.name, { meta, component: registered });
+			if (meta.name === 'conversation.input.overlay') component = registered;
+		},
 	},
 };
 const ctx = {
@@ -225,6 +231,37 @@ const rule = (css, selector) => {
 	const open = css.indexOf('{', at);
 	return css.slice(open + 1, css.indexOf('}', open));
 };
+const hasClass = (node, name) => typeof node.props.className === 'string'
+	&& node.props.className.split(' ').includes(name);
+/** The first element carrying that exact class token. */
+const find = (node, name) => {
+	if (node === null || node === undefined || typeof node !== 'object') return null;
+	if (Array.isArray(node)) {
+		for (const child of node) {
+			const hit = find(child, name);
+			if (hit !== null) return hit;
+		}
+		return null;
+	}
+	if (hasClass(node, name)) return node;
+	for (const child of node.children ?? []) {
+		const hit = find(child, name);
+		if (hit !== null) return hit;
+	}
+	return null;
+};
+const findAll = (node, name, found = []) => {
+	if (node === null || node === undefined || typeof node !== 'object') return found;
+	if (Array.isArray(node)) {
+		for (const child of node) findAll(child, name, found);
+		return found;
+	}
+	if (hasClass(node, name)) found.push(node);
+	for (const child of node.children ?? []) findAll(child, name, found);
+	return found;
+};
+/** The row for one setting, so a test can address a control without counting positions. */
+const settingRow = (tree, key) => findAll(tree, 'dsh-htt-set-row').find((row) => row.props['data-setting'] === key);
 
 //#endregion
 
@@ -260,7 +297,7 @@ const render = (hovered, view, box = BOX, props = {}) => {
 
 /** A keyboard event carrying only what the plugin reads. */
 const key = (over) => ({
-	key: ' ', code: 'Space', ctrlKey: true, shiftKey: true, repeat: false,
+	key: ' ', code: 'Space', ctrlKey: true, shiftKey: true, altKey: false, metaKey: false, repeat: false,
 	preventDefault() { this.prevented = true; },
 	stopPropagation() { this.stopped = true; },
 	...over,
@@ -403,6 +440,85 @@ check(inputActions.captured === 0, 'a non-chord key never starts a recording');
 
 //#endregion
 
+//#region the settings page and the configuration behind it
+
+/** Mount the bundle's own page, with the DOM and listener registry reset. */
+const mountSettings = () => {
+	for (const cleanup of cleanups) cleanup();
+	cleanups = [];
+	listeners.clear();
+	preset = [];
+	hookIndex = 0;
+	refQueue = [];
+	const entry = registrations.get('plugins.bundle.config');
+	return entry === undefined ? null : entry.component({ t: undefined });
+};
+
+const settingsEntry = registrations.get('plugins.bundle.config');
+check(settingsEntry !== undefined, 'the bundle registers a settings page');
+check(settingsEntry?.meta.key === '@jryang1997/dsh-composer-dictation',
+	'the page is keyed by package name, which is what the manager passes down as entryKey');
+check(settingsEntry?.meta.locale === 'dsh-composer-dictation', 'the page carries its locale namespace');
+
+let page = mountSettings();
+check(classes(page).includes('dsh-htt-set'), 'the settings page renders');
+check(findAll(page, 'dsh-htt-set-row').length >= 4, 'each setting gets its own row');
+check(find(page, 'dsh-htt-set-number').props.value === 300, 'the hold duration starts at its default');
+
+// The field is not a suggestion: a stored or typed value is fitted to the schema.
+const typeHold = (value) => find(mountSettings(), 'dsh-htt-set-number').props.onChange({ target: { value } });
+typeHold('99999');
+check(find(mountSettings(), 'dsh-htt-set-number').props.value === 800, 'a value above the range clamps');
+typeHold('10');
+check(find(mountSettings(), 'dsh-htt-set-number').props.value === 150, 'a value below the range clamps');
+typeHold('nonsense');
+check(find(mountSettings(), 'dsh-htt-set-number').props.value === 300, 'a value that is not a number falls back');
+typeHold('450');
+check(find(mountSettings(), 'dsh-htt-set-number').props.value === 450, 'a value inside the range sticks');
+
+// Motion is a choice, and it reaches the layer as an attribute rather than a re-render.
+page = mountSettings();
+const chooseIn = (groupKey, text) => {
+	const option = findAll(settingRow(page, groupKey), 'dsh-htt-set-segment')
+		.find((node) => node.children.includes(text));
+	check(option !== undefined, `${groupKey} offers ${JSON.stringify(text)}`);
+	option.props.onClick();
+};
+chooseIn('motion', '精简');
+check(find(render(true, IDLE), 'dsh-htt-layer').props['data-motion'] === 'calm',
+	'the chosen motion reaches the layer');
+
+// The hint toggle reaches the hint.
+page = mountSettings();
+find(settingRow(page, 'hint'), 'dsh-htt-set-toggle').props.onClick();
+check(attrs(render(true, IDLE), 'data-on').length === 0, 'turning the hint off stops it switching on');
+page = mountSettings();
+find(settingRow(page, 'hint'), 'dsh-htt-set-toggle').props.onClick();
+check(attrs(render(true, IDLE), 'data-on').length === 1, 'and turning it back on brings it back');
+
+// The chord setting has to reach the gesture itself, or it is only a picture of a setting.
+page = mountSettings();
+chooseIn('chord', 'Ctrl + Shift + D');
+inputActions.captured = 0;
+render(true, IDLE);
+fire('keydown', key());
+check(inputActions.captured === 0, 'the old chord stops working once another is chosen');
+fire('keydown', key({ code: 'KeyD', key: 'd' }));
+check(inputActions.captured === 1, 'the chosen chord starts a capture');
+
+// Restore defaults puts every one of them back.
+page = mountSettings();
+find(page, 'dsh-htt-set-reset').props.onClick();
+page = mountSettings();
+check(find(page, 'dsh-htt-set-number').props.value === 300, 'restore brings the defaults back');
+check(find(render(true, IDLE), 'dsh-htt-layer').props['data-motion'] === 'full', 'and the layer follows');
+inputActions.captured = 0;
+render(true, IDLE);
+fire('keydown', key());
+check(inputActions.captured === 1, 'and so does the chord');
+
+//#endregion
+
 //#region the injected stylesheet
 
 const css = styleText(render(true, IDLE));
@@ -456,6 +572,17 @@ for (const query of ['prefers-reduced-motion', 'prefers-reduced-transparency', '
 const reduced = css.slice(css.indexOf('prefers-reduced-motion'));
 check(!/transition:none/.test(reduced), 'reduced motion keeps a transition rather than removing it');
 check(/opacity 140ms linear/.test(reduced), 'reduced motion still cross-fades');
+
+// The calm setting is the same softening, chosen rather than signalled.
+check(css.includes('.dsh-htt-layer[data-motion=calm]'), 'the calm preference has its own rules');
+
+// The settings page brings its own stylesheet, because it renders in a different slot.
+const settingsCss = styleText(mountSettings());
+check(typeof settingsCss === 'string' && settingsCss.includes('.dsh-htt-set-row'),
+	'the settings page injects its own styles');
+check(count(settingsCss, '{') === count(settingsCss, '}'), 'settings stylesheet braces balance');
+check(rule(settingsCss, '.dsh-htt-set-number:focus-visible').includes('outline-style:solid'),
+	'the settings controls take keyboard focus visibly');
 
 //#endregion
 
