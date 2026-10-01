@@ -123,7 +123,6 @@ activated.
 | Press `Esc` while recording or transcribing | Cancel |
 | Hold, then drag up ≥48 px **or move the pointer off the box** | The capsule and the card's outline wash red and the word changes to "release to discard"; release there to drop it, come back to keep it |
 | **Hold `Ctrl`+`Shift`+`Space`**, then release | The same gesture with no mouse: hold the chord to record, let go to transcribe |
-| Click the **microphone button** in the tool row | A toggle rather than a hold: press to start, press again to finish. This is the seat a keyboard or screen-reader user can actually find |
 | A plain click, a drag, or selecting text | Nothing happens — the arc retracts and the gesture never arms |
 
 ### Keyboard
@@ -137,12 +136,11 @@ chip all behave identically.
 The chord is deliberately awkward to hit by accident, and it never claims a keystroke unless
 it actually starts a recording.
 
-And there is a **button**: a 28 px microphone in the composer's tool row, to the left of the
-model selector. It is a real control — Tab reaches it, Enter activates it, and
-`aria-keyshortcuts` on it is how a keyboard user discovers the chord exists. Its model is a
-**toggle** rather than a hold (press to start, press again to finish), because keeping a key
-pressed with a button is an awkward thing to ask, and because that is what the shipped
-microphone does.
+> **It is not advertised anywhere in the interface, and that is on purpose.** This plugin
+> renders into a floating layer, which has nowhere to put a focusable control — and it does not
+> need one, because the official Voice input bundle already puts a microphone button next to
+> Send. That button is your visible, focusable entry to dictation; this chord is the keyboard
+> route to *this* gesture, which inserts at the caret without switching modes.
 
 ### Settings
 
@@ -262,9 +260,11 @@ Interface-by-interface notes, verified against the shipped packages, live in
 
 ## Known limitations
 
-- **The tool-row button is hidden while the shipped voice input is expanded.** It lives in
-  `conversation.input.left`, and the composer hides that whole group when the official
-  microphone's activity expands — so during an official recording, the chord is the only way in.
+- **The keyboard shortcut is documented, not advertised.** `Ctrl`+`Shift`+`Space` starts and
+  ends a recording but nothing in the interface mentions it — the layer this plugin renders
+  into has nowhere to put a focusable control. It is not a trap: the official Voice input
+  bundle's own microphone button sits next to Send and is fully keyboard reachable. That button
+  drives the official dictation, though, not this gesture.
 - **Touch is handled defensively, not verified.** A touch press gets its own, longer hold and a
   wider slop, and suppresses the word selection and native context menu that a long press
   otherwise triggers — the composer itself does nothing about either. That last part depends on
@@ -324,6 +324,7 @@ be pinned to it. The short version:
 
 | Version | What it was about |
 |---|---|
+| [1.5.1](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.1) | A correction: the duplicate microphone from 1.4.0 is gone, the hover hint joins the tool row's typography, and the glyph is the host's own |
 | [1.5.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.0) | A separate hold for a finger, and suppression of the word selection and native menu a long press otherwise triggers — the host does nothing about touch at all |
 | [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | A focusable microphone button in the tool row — the keyboard entry finally becomes findable |
 | [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | A settings page, and the configuration module it forced into existence |
@@ -429,7 +430,6 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 | 按住后上滑 ≥48 px，**或把鼠标移出输入框** | 胶囊与输入框外框一起泛红、文字变成「松开丢弃」；在那里松手即丢弃，移回来则保留 |
 | 单击、拖拽、拖选文字 | 什么都不发生 —— 进度环自己退回，手势不会激活 |
 | **按住 `Ctrl`+`Shift`+`空格`**，然后松开 | 同一套手势，只是不用鼠标：按住和弦开始录音，松开即转写 |
-| 点工具行里的**麦克风按钮** | 开关而非按住：按一下开始，再按一下结束。这是键盘与读屏用户真正找得到的入口 |
 
 ### 键盘
 
@@ -439,9 +439,10 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 
 和弦刻意做得不容易误触，并且**只在真正开始录音时才拦截按键**。
 
-另外还有一个**按钮**：工具行里、模型选择器左侧的一枚 28 px 麦克风。它是真正的控件 —— Tab 能到、
-回车能按，而它身上的 `aria-keyshortcuts` 正是键盘用户发现快捷键存在的地方。它的模型是**开关**
-而不是按住（按一下开始、再按一下结束），因为用按钮去"按住不放"很别扭，而且官方麦克风就是这么做的。
+> **它没有在界面上任何地方宣传，这是有意的。** 本插件渲染进一个浮层，那里没有位置放可聚焦的
+> 控件 —— 而且也**不需要**：官方语音输入 bundle 已经在发送键旁边放了一个麦克风按钮。那个按钮
+> 才是你看得见、键盘到得了的语音入口；而这个和弦是通往**本插件这套手势**的键盘路径 —— 它不切换
+> 模式，直接插到光标处。
 
 ### 设置
 
@@ -551,8 +552,9 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 
 ## 已知限制
 
-- **官方语音展开时，工具行的按钮会被隐藏。** 它住在 `conversation.input.left`，而输入框在官方
-  麦克风的 activity 展开时会把这一整组隐藏 —— 所以官方录音期间，和弦是唯一入口。
+- **键盘快捷键只写在文档里，界面上没有宣传。** `Ctrl`+`Shift`+`空格` 能起停录音，但界面里没有
+  任何地方提到它 —— 本插件所在的浮层没有位置放可聚焦控件。这不算把人困住：官方语音输入 bundle
+  自己的麦克风按钮就在发送键旁边，键盘完全可达。只是那个按钮驱动的是官方的听写，不是本手势。
 - **触摸是防御性处理过的，但没有在真机上验证过。** 触摸按压有自己的更长阈值和更宽的容差，并且会
   拦掉长按本来会触发的选词与原生右键菜单 —— 宿主自己对这两件事都没有任何处理。后半句依赖
   `preventDefault()` 能否抵达桌面壳的右键菜单处理器，**这一点没有在真实硬件上确认过**：
@@ -604,6 +606,7 @@ plugin_manager → action: install_bundle → target: github:jryang1997/dsh-comp
 
 | 版本 | 这一版在解决什么 |
 |---|---|
+| [1.5.1](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.1) | 一次纠正：1.4.0 那个重复的麦克风拆掉了，提示行归入工具行的排版，图标换成宿主自己的 |
 | [1.5.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.0) | 手指有自己的一套阈值，并且拦掉长按本来会触发的选词与原生菜单 —— 宿主对触摸完全不管 |
 | [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | 工具行里一个可聚焦的麦克风按钮 —— 键盘入口终于变得找得到 |
 | [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | 设置页，以及它逼出来的那个配置模块 |

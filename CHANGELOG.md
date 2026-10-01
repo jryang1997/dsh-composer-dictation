@@ -7,6 +7,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-10-01
+
+A correction. 1.4.0 fixed a problem that did not exist.
+
+### Fixed
+
+- **The duplicate microphone is gone.** 1.4.0 added a focusable microphone button to the tool
+  row on the grounds that a chord cannot be found by pressing Tab. That reasoning was wrong:
+  this plugin cannot run without the official voice-input bundle, and that bundle *already* puts
+  a focusable microphone button next to Send. So the button was never the only keyboard entry —
+  it was a second microphone a few centimetres from the first, which is exactly what it looked
+  like on screen. The chord stays, and the honest limitation returns with it: the shortcut is
+  documented rather than advertised, and the visible microphone belongs to the official plugin.
+- **The hover hint now speaks the tool row's typography.** It was 13px / 400 / 18px carrying its
+  own letter-spacing; the host's model selector is 13px / 500 / 20px with none. Sitting between
+  the mode chips and the model selector, it read as a foreign element that happened to be
+  nearby rather than a line of the same row.
+- **The microphone glyph is now the host's own**, reproduced glyph-for-glyph:
+  `IconMicrophoneOutlineRegular` from `@deepseek-ai/dsh-client-ui-primitives` — a stroked capsule
+  and an arc, `fill: none`, `stroke: currentColor`, 1px in a 16×16 box. The previous one was a
+  hand-drawn *filled* shape, which is why the two microphones never quite matched.
+
+### Removed
+
+- `DictationButton`, its stylesheet, the `session` store that carried state between it and the
+  recording surface, and the three strings it needed. The store existed solely so two seats
+  could talk to each other; with one seat left, it has nothing to say.
+
 ## [1.5.0] - 2026-10-01
 
 The gesture was built for a mouse and never tuned for a finger. The host does nothing about
@@ -196,7 +224,8 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.2.0...v1.3.0
