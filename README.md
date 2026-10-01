@@ -1,24 +1,37 @@
 # dsh-composer-dictation
 
+[![check](https://github.com/jryang1997/dsh-composer-dictation/actions/workflows/check.yml/badge.svg)](https://github.com/jryang1997/dsh-composer-dictation/actions/workflows/check.yml)
+[![release](https://img.shields.io/github/v/release/jryang1997/dsh-composer-dictation)](https://github.com/jryang1997/dsh-composer-dictation/releases)
+[![license](https://img.shields.io/github/license/jryang1997/dsh-composer-dictation)](LICENSE)
+[![topic](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
+
 **English** · [中文](#中文)
 
 Long-press anywhere on the composer card in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) to dictate.
 Release to transcribe and drop the text into the draft — nothing is sent automatically.
 
 ```
-┌──────────────────────────────────────────────┐
-│  按住鼠标 语音输入文字            ← fades in  │   ← hover the input box
-│                                              │
-│  ⌄  ＋  权限  计划            [ model ] [ ➤ ] │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                                                      │
+│  ⌄  ＋  权限  计划    🎤 按住鼠标语音输入文字  [◉] [➤] │
+│                       ↑ the hint tucks into the tool  │
+│                         row — never over your draft   │
+└──────────────────────────────────────────────────────┘
 
-        hold ≈0.35 s  ↓
+        press and hold ≈0.3 s ↓  (a ring draws at the pointer)
 
-┌──────────────────────────────────────────────┐
-│         ▁▃▅▇▅▃▁   正在聆听 · 松开完成         │   ← release to transcribe
-│                   Esc 取消 · 上滑取消         │
-└──────────────────────────────────────────────┘
+                  ╭──────────────────────────────╮
+                  │  ●  ▁▂▅▇▅▃▂▁▂▄▆▄▂▁   松开完成  │   ← the bubble floats
+                  ╰──────────────────────────────╯     above the card
+┌──────────────────────────────────────────────────────┐
+│  your draft is still here — readable, typeable       │
+│  ⌄  ＋  权限  计划                          [◉] [➤] │
+└──────────────────────────────────────────────────────┘
 ```
+
+Recording does **not** take the composer over. The bubble is a floating capsule above the
+card, and the card is left completely alone, so you can keep reading and editing what you
+were writing while you dictate.
 
 ---
 
@@ -65,6 +78,16 @@ or ask the agent in any session:
 > Install the bundle `github:jryang1997/dsh-composer-dictation` with `plugin_manager`
 > (`action: install_bundle`).
 
+A git install is pinned to the commit it was installed from. To pin it to a release instead
+— so you know exactly what you are running, and can move deliberately — name the tag:
+
+```bash
+dsh plugin --profile <profile> add github:jryang1997/dsh-composer-dictation#v1.1.0
+```
+
+See [Releases](https://github.com/jryang1997/dsh-composer-dictation/releases) for what
+changed in each one, and [`CHANGELOG.md`](CHANGELOG.md) for the detail.
+
 **B. Install from a clone**
 
 Cloning first also works, and is the route to take when you want to modify the plugin
@@ -94,12 +117,12 @@ activated.
 
 | Gesture | Result |
 |---|---|
-| Hover the input box | The hint fades in over ~0.6 s |
-| Press and hold ≈0.35 s without moving | The whole card becomes a recording surface |
+| Hover the input box | A hint appears in the tool row, between the mode chips and the model selector |
+| Press and hold ≈0.3 s without moving | A ring draws at the pointer, then a capsule floats up above the card: a live dot, the level waveform, and one short word |
 | Release | Transcript is inserted at the caret — **not** sent |
 | Press `Esc` while recording or transcribing | Cancel |
-| Hold, then swipe up ≥48 px **or move the pointer off the box**, then release | Cancel — the panel turns red first, and moving back keeps the recording |
-| A plain click, a drag, or selecting text | Nothing happens — the gesture never arms |
+| Hold, then drag up ≥48 px **or move the pointer off the box** | The capsule and the card's outline wash red and the word changes to "release to discard"; release there to drop it, come back to keep it |
+| A plain click, a drag, or selecting text | Nothing happens — the arc retracts and the gesture never arms |
 
 If the draft changed while recognition was running, the transcript is **kept** in a small
 lower-right chip; click it to insert at the current caret.
@@ -110,11 +133,54 @@ Everything lives at the top of `client.js`; there is no build step, so edit and 
 
 | Constant | Default | Meaning |
 |---|---|---|
-| `HOLD_MS` | `350` | How long the press must stay still |
+| `HOLD_MS` | `300` | How long the press must stay still |
 | `ARM_TOLERANCE_PX` | `10` | Movement that disarms the gesture |
-| `CANCEL_DISTANCE_PX` | `48` | Upward travel that arms "release to cancel" (leaving the box arms it too) |
+| `CANCEL_ARM_PX` | `48` | Upward travel that arms "release to discard" (leaving the box arms it too) |
+| `CANCEL_RELEASE_PX` | `38` | Where it disarms again — the 10 px band is what stops the capsule flickering |
+| `CANCEL_FLICK_PX_PER_S` | `150` | Release speed that overrides position when deciding discard vs. keep |
 | `MIN_SECONDS` | `0.35` | Recordings shorter than this are dropped |
 | `NOTICE_MS` | `2800` | How long a one-line notice stays |
+| `EXIT_MS` | `180` | How long any surface takes to leave |
+| `METER_SETTLE_MS` | `240` | How long the level trace keeps draining after you release |
+
+Easing, durations and materials are not tuned by hand here — they are read from the host
+app's own tokens. See [Motion](#motion).
+
+## Motion
+
+The plugin deliberately owns no motion vocabulary of its own; it borrows DeepSeek
+Harness's, so it reads as part of the app rather than as a guest.
+
+| Decision | Where it comes from |
+|---|---|
+| Entrance curve `cubic-bezier(.16,1,.3,1)` | the curve DSH's own menu and preset entrances use |
+| Exit curve `cubic-bezier(.4,0,.2,1)` | `--ds-ease-in-out` |
+| 140–200 ms durations | inside the app's `--ds-transition-duration` band |
+| The card's outline in the discard state | `--dsw-radius-panel`, the composer card's own 28 px — which the app also renders as a squircle via `corner-shape: superellipse(1.5)` |
+| The capsule's surface | `--dsw-specific-menu` over `--dsw-menu-backdrop-filter`: the recipe `MenuSurface.module.css` uses for every floating layer |
+| The capsule's shadow | `--dsw-elevation-prominent`, the host's shadow for a surface that floats above content |
+| Level meter | the shipped voice input's waveform: 28 RMS samples in a shift register, redrawn at 20 fps |
+
+Four rules hold everywhere, and `tests/render.test.mjs` enforces them:
+
+1. **Recording runs alongside you, it does not take over.** Apple's rule is *dim to focus,
+   separate to keep flow*: a panel that is parallel to what you are doing uses translucency
+   and offset **without** a scrim. The capsule floats above the card; the card is untouched,
+   so your draft stays readable and typeable for the whole recording.
+2. **Entry and exit are transitions, never keyframes.** Entry rides `@starting-style`,
+   exit a `data-leaving` attribute. Anything the user reverses mid-flight — a hold that
+   turns into a drag, a bubble reopening during its own exit — retargets from where it
+   actually is instead of restarting.
+3. **Only `transform`, `opacity`, `translate` and `scale` are animated.** The meter used
+   to animate `height`, which cost a layout per bar per frame.
+4. **The gesture is a continuous quantity, not a boolean.** How far you have dragged
+   toward "discard" is one number (`--dsh-htt-cancel`) that drives the red wash, the
+   ✕ glyph, the card's hairline and the meter's retreat together, so the state is
+   steerable rather than switched.
+
+Text is treated as a last resort: the capsule shows a word only while a release would
+actually discard the recording. While everything is fine, the live dot and the waveform
+say it without any words at all.
 
 ## How it works
 
@@ -122,11 +188,12 @@ Everything lives at the top of `client.js`; there is no build step, so edit and 
 |---|---|
 | Where it renders | One entry in the `conversation.input.overlay` slot — a floating layer inside the composer card |
 | Gesture surface | `node.closest('[data-composer-card]')` from its own node, listening in the capture phase |
+| Hint placement | Measured from the tool row: the hint is aimed at the gap in front of the row's trailing group, so it can never cover the draft or a control |
 | Never disturbing typing | The layer is `pointer-events: none`; nothing is `preventDefault`ed before the hold threshold |
 | Recording | `getUserMedia` + `MediaRecorder` → `OfflineAudioContext` resample to 16 kHz mono → 44-byte PCM16 WAV |
 | Recognition | `ctx.remote.speech.transcribe({ audioBase64 })`; provider and language come from the Host config |
 | Draft insertion | The slot's own `inputActions.captureInsertion()` / `insertText(text, span)`, guarded by `draftRev` |
-| Styling | Only `--dsw-alias-*` theme tokens, so light and dark both work |
+| Styling | Only `--dsw-alias-*` theme tokens plus the host's own surface/material/radius tokens, so light, dark and `prefers-reduced-transparency` all work |
 | Text | Registered through `ctx.locale` (`zh`, `en`) |
 
 Interface-by-interface notes, verified against the shipped packages, live in
@@ -139,14 +206,18 @@ Interface-by-interface notes, verified against the shipped packages, live in
   next addition.
 - **Mouse-first.** Touch input is untested: on a touch screen a long press also drives text
   selection, so the thresholds would probably need tuning there.
+- **The hint needs room.** It lives in the tool row's empty middle, so on a very narrow
+  composer — where the mode chips and the model selector leave no gap — it is dropped
+  rather than allowed to overlap a control.
 - It leans on two internal DSH interfaces — the `conversation.input.overlay` slot and the
   `speech` remote — which can change between Harness releases.
 
 ## Development
 
 No dependencies and no build step. `npm run check` parses both halves, validates the bundle
-manifest, and checks the locale dictionaries for key and placeholder parity (the same checks
-run in CI).
+manifest, checks the locale dictionaries for key and placeholder parity, and renders the
+client component across every gesture state — including the motion rules from
+[Motion](#motion), which would otherwise regress silently. The same checks run in CI.
 
 ## Distribution and discovery
 
@@ -172,7 +243,7 @@ reinstall — there is no auto-update:
 
 ```text
 plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
-plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation
+plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation#v1.1.0
 ```
 
 Removing first matters: re-installing over an existing row can report `ambiguous-install`,
@@ -180,6 +251,17 @@ because the dependency spec itself has not changed.
 
 Reload the page afterwards. The client half is a browser module, and it keeps the copy it
 already loaded until the page is refreshed.
+
+## Changelog
+
+Every release is documented in [`CHANGELOG.md`](CHANGELOG.md), in
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form, and tagged so an install can
+be pinned to it. The short version:
+
+| Version | What it was about |
+|---|---|
+| [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | Recording stopped taking the composer over: a floating capsule, an acknowledged press, real exits, and a motion vocabulary borrowed from the host |
+| [1.0.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0) | The hold-to-talk gesture itself, and everything it needs to be safe to use |
 
 ## Uninstall
 
@@ -272,12 +354,15 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 
 | 手势 | 结果 |
 |---|---|
-| 鼠标移入输入框 | 提示行约 0.6 秒慢慢浮现 |
-| 按住不动约 0.35 秒 | 整张输入框变成录音面板 |
+| 鼠标移入输入框 | 工具行中间（模式按钮与模型选择器之间）出现一行提示 |
+| 按住不动约 0.3 秒 | 指针处先画出一个进度环，随后输入框上方浮起一颗胶囊：一个实心状态点、实时波形、四个字 |
 | 松开 | 转写文字插入光标处，**不发送** |
 | 录音中或识别中按 `Esc` | 取消 |
-| 按住后上滑 ≥48 px，**或把鼠标移出输入框**，再松开 | 取消 —— 面板会先变红，移回输入框可继续录音 |
-| 单击、拖拽、拖选文字 | 什么都不发生 —— 手势根本不会激活 |
+| 按住后上滑 ≥48 px，**或把鼠标移出输入框** | 胶囊与输入框外框一起泛红、文字变成「松开丢弃」；在那里松手即丢弃，移回来则保留 |
+| 单击、拖拽、拖选文字 | 什么都不发生 —— 进度环自己退回，手势不会激活 |
+
+**录音不会接管输入框。** 胶囊浮在卡片上方，卡片本身完全不动，所以你说的整段时间里草稿一直是
+可读、可编辑的。
 
 如果识别期间草稿被改动过，转写结果会**保留**在右下角的小胶囊里，点一下即可插入到当前光标。
 
@@ -287,11 +372,49 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 
 | 常量 | 默认 | 含义 |
 |---|---|---|
-| `HOLD_MS` | `350` | 按住多久才算语音输入 |
+| `HOLD_MS` | `300` | 按住多久才算语音输入 |
 | `ARM_TOLERANCE_PX` | `10` | 超过这个位移就不激活 |
-| `CANCEL_DISTANCE_PX` | `48` | 上滑多少像素进入「松手取消」（移出输入框同样会进入） |
+| `CANCEL_ARM_PX` | `48` | 上滑多少像素进入「松手丢弃」（移出输入框同样会进入） |
+| `CANCEL_RELEASE_PX` | `38` | 退回多少才解除 —— 这 10 px 的滞回带就是胶囊不再闪红闪蓝的原因 |
+| `CANCEL_FLICK_PX_PER_S` | `150` | 松手速度，优先于位置决定「丢弃还是保留」 |
 | `MIN_SECONDS` | `0.35` | 短于此长度的录音直接丢弃 |
 | `NOTICE_MS` | `2800` | 一行提示停留多久 |
+| `EXIT_MS` | `180` | 任何一个临时表面退场所需时间 |
+| `METER_SETTLE_MS` | `240` | 松手后电平轨迹继续消退多久 |
+
+缓动、时长与材质都不在这里手调 —— 它们直接取自宿主应用自己的令牌，见下节。
+
+## 动效
+
+插件刻意不发明自己的动效语汇，而是借用 DeepSeek Harness 的，这样它读起来像应用的一部分，
+而不是一个外来户。
+
+| 决定 | 出处 |
+|---|---|
+| 入场曲线 `cubic-bezier(.16,1,.3,1)` | DSH 自己的菜单与预设座位入场用的曲线 |
+| 退场曲线 `cubic-bezier(.4,0,.2,1)` | `--ds-ease-in-out` |
+| 140–200 ms 时长 | 落在应用的 `--ds-transition-duration` 区间内 |
+| 丢弃态下输入框的那道外框 | `--dsw-radius-panel`，也就是输入框卡片自己的 28 px —— 而应用还通过 `corner-shape: superellipse(1.5)` 把它渲染成超椭圆 |
+| 胶囊材质 | `--dsw-specific-menu` 叠 `--dsw-menu-backdrop-filter`，即 `MenuSurface.module.css` 给所有浮动层用的那套配方 |
+| 胶囊投影 | `--dsw-elevation-prominent`，宿主给「浮在内容之上」的表面的阴影档 |
+| 电平表 | 官方语音输入的波形：28 个 RMS 采样移位寄存器，20 fps 重绘 |
+
+四条规则贯穿始终，并由 `tests/render.test.mjs` 守着：
+
+1. **录音是并行的，不是接管。** 苹果的原则是「聚焦用压暗，并行用分区」：跟手头的事**并行**的
+   面板靠半透明与位移来分层，**不压暗背景**。所以胶囊浮在卡片上方、卡片分毫不动，你说的整段
+   时间里草稿都可读可写。
+2. **入场与退场都是 transition，绝不用 keyframes。** 入场走 `@starting-style`，退场走
+   `data-leaving` 属性。凡是用户可能中途反转的动作 —— 按住后改成拖拽、胶囊正在退场时又
+   开始新录音 —— 都从它当前实际所在的位置接着走，而不是重播。
+3. **只动 `transform` / `opacity` / `translate` / `scale`。** 电平条原先动的是 `height`，
+   等于每帧为每根条付一次 layout。
+4. **手势是一个连续量，不是布尔值。** 你朝「丢弃」拖了多远是一个数
+   （`--dsh-htt-cancel`），红晕、✕ 图标、输入框外框、电平条的退让由它一起驱动，所以状态是被你
+   操纵的，而不是被切换的。
+
+文字在这里是最后的选项：胶囊只在「松手会真的丢东西」时才显示一个词。一切正常的时候，
+状态点和波形不用任何文字就把话说完了。
 
 ## 实现原理
 
@@ -299,11 +422,12 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 |---|---|
 | 渲染位置 | `conversation.input.overlay` 座位的一个条目 —— 输入框卡片内的浮层 |
 | 手势面 | 从自身节点 `closest('[data-composer-card]')` 拿到卡片，捕获阶段监听 |
+| 提示行位置 | 从工具行量出来：提示行对齐到工具行尾部控件组前面的空档，因此永远不会压住草稿或某个控件 |
 | 不干扰打字 | 浮层默认 `pointer-events: none`；达到长按阈值前不做任何 `preventDefault` |
 | 录音 | `getUserMedia` + `MediaRecorder` → `OfflineAudioContext` 重采样到 16 kHz 单声道 → 44 字节 PCM16 WAV |
 | 识别 | `ctx.remote.speech.transcribe({ audioBase64 })`，provider 与语言由 Host 配置决定 |
 | 写草稿 | 座位自带的 `inputActions.captureInsertion()` / `insertText(text, span)`，带 `draftRev` 校验 |
-| 样式 | 只用 `--dsw-alias-*` 主题令牌，明暗主题都正常 |
+| 样式 | 只用 `--dsw-alias-*` 主题令牌，外加宿主自己的表面 / 材质 / 圆角令牌，因此明暗主题与 `prefers-reduced-transparency` 都正常 |
 | 文案 | 通过 `ctx.locale` 注册（`zh`、`en`） |
 
 逐接口的源码笔记（对照发行包核实过）在 [docs/design.md](docs/design.md)。
@@ -313,13 +437,16 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 - **只能用指针。** 长按是唯一入口，目前没有键盘等价操作，纯键盘用户无法触达。加一个可聚焦的
   触发按钮是下一步最该做的事。
 - **以鼠标为主。** 触摸屏未验证：触摸长按同时会驱动文本选择，阈值大概需要另调。
+- **提示行需要空间。** 它待在工具行中间的空档里，所以输入框特别窄时（模式按钮与模型选择器
+  之间挤不出空档）它会被直接省掉，而不是允许它压住控件。
 - 依赖 DSH 的两个内部接口 —— `conversation.input.overlay` 座位与 `speech` 远程命名空间 ——
   它们可能随 Harness 版本变化。
 
 ## 开发
 
-零依赖、无构建步骤。`npm run check` 会解析两个半边、校验 bundle manifest，并检查两份文案的
-键与占位符是否一致（CI 里跑的就是这几项）。
+零依赖、无构建步骤。`npm run check` 会解析两个半边、校验 bundle manifest、检查两份文案的
+键与占位符是否一致，并把客户端组件在**每一种手势状态**下渲染一遍 —— 其中包含[动效](#动效)
+那四条规则，否则它们会悄无声息地退化。CI 里跑的就是这几项。
 
 ## 分发与发现
 
@@ -343,12 +470,22 @@ git 安装是钉在安装时那个提交上的，没有自动更新，出新版�
 
 ```text
 plugin_manager → action: remove_bundle → target: @jryang1997/dsh-composer-dictation
-plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation
+plugin_manager → action: install_bundle → target: github:jryang1997/dsh-composer-dictation#v1.1.0
 ```
 
 **必须先 remove**：直接在原行上重装会报 `ambiguous-install`，因为依赖声明本身没有变化。
 
 装完记得刷新页面。客户端半是浏览器模块，不刷新会继续用已经加载的那份。
+
+## 变更日志
+
+每个版本都记在 [`CHANGELOG.md`](CHANGELOG.md) 里（[Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式），
+并且打了 tag，所以安装可以钉在某个版本上。一句话版：
+
+| 版本 | 这一版在解决什么 |
+|---|---|
+| [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | 录音不再接管输入框：悬浮胶囊、按下即有反馈、真正的退场，以及一套借自宿主的动效语汇 |
+| [1.0.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0) | 长按说话这个手势本身，以及让它安全可用所需的全部东西 |
 
 ## 卸载
 

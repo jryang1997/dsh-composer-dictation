@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: DeepSeek Harness itself
+    url: https://github.com/deepseek-ai/deepseek-harness
+    about: Bugs in the Host, the composer, or the speech service belong upstream, not here.
+  - name: Is the speech service prepared?
+    url: https://github.com/jryang1997/dsh-composer-dictation#requirements--read-this-first
+    about: This plugin ships no recogniser. Check this first — it explains most "nothing happens" reports.

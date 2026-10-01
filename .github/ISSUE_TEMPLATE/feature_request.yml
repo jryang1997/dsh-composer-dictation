@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest a change to the gesture, the surface, or how it degrades.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This plugin is deliberately narrow: it does one gesture and reuses the Host's speech
+        service. Ideas that fit are usually about **the gesture, the recording surface, or
+        what happens when a host contract is missing**. Ideas that add a second way to do the
+        same thing tend to be declined — see *Known limitations* in the README for the ones
+        that are already on the list.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Describe the situation you are in, not the feature you have in mind. What
+        are you trying to do that the plugin gets in the way of?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does this belong?
+      options:
+        - The hold gesture (thresholds, cancel, arming)
+        - The recording surface (capsule, waveform, text)
+        - Accessibility (keyboard entry, screen readers, reduced motion)
+        - Host compatibility (a DSH update broke something)
+        - Documentation
+        - Something else
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: existing
+    attributes:
+      label: Checks
+      options:
+        - label: I read *Known limitations* in the README.
+          required: true
+        - label: I searched the existing issues.
+          required: true

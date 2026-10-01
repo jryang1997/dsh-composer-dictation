@@ -1,0 +1,83 @@
+name: Bug report
+description: Something behaves differently from what the README says it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most reports here come down to two things: **which speech provider is configured**,
+        and **what the browser console says**. The form asks for both.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Before you start
+      options:
+        - label: The official **Voice input** bundle is enabled in Settings → Plugins.
+          required: true
+        - label: I know that if that bundle is disabled, this plugin registers nothing by
+            design and the composer behaves completely normally.
+          required: true
+        - label: I reloaded the page (`Ctrl+R`) after installing or updating.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I held the mouse on the input box for about a second, the capsule appeared, I spoke,
+        I released — and nothing was inserted. I expected the transcript in the draft.
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser console output
+      description: Open the developer console before reproducing. Paste any errors verbatim —
+        `dsh-composer-dictation: [data-composer-card] not found` in particular tells us the
+        composer layout changed.
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DeepSeek Harness version
+      description: Shown in Settings → About, or from the app's version file.
+      placeholder: 0.1.7-rc.2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Speech provider
+      description: Settings → Plugins → Voice input.
+      options:
+        - sensevoice-local (the default, runs on this machine)
+        - A cloud provider
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+
+  - type: textarea
+    id: theme
+    attributes:
+      label: Anything else
+      description: Light or dark theme, display scaling, a second display, a screen reader,
+        reduced-motion or reduced-transparency enabled — anything that might matter for a
+        gesture and a floating surface.
+    validations:
+      required: false

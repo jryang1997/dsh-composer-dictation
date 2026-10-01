@@ -59,6 +59,47 @@ Two rules keep typing intact:
 The layer needs an explicit height because the anchor it lives in is zero-height; the
 component measures the card with a `ResizeObserver` instead of guessing.
 
+`overlayAnchor` is `height: 0; position: absolute; inset: 0 0 auto`, so it is a **positioning
+context at the card's top edge**, not a full-card cover. `inset: 0` inside it would collapse
+to nothing; the shipped consumer of this slot (`MenuView` in `dsh-client-ui-input-trigger`)
+instead uses `bottom: calc(100% + 4px); left: 0; right: 0` to float *above* the card.
+
+This plugin measures the card and sets its own height, which is what lets the card's outline
+be drawn at exactly the card's box. Note that it deliberately does **not** cover the card:
+an earlier version filled the whole composer with a recording panel, which meant the draft
+disappeared exactly when the user might still want to read it — and, worse, turned the
+panel's own exit animation into an invisible click shield over the editor. The recording
+surface is now a capsule floating above the card (`bottom: calc(100% + 10px)`, centred),
+using the same slot idiom the slash-menu uses. Nothing the plugin draws above the card ever
+takes a pointer event.
+
+### Where the hint goes
+
+The hint is the one element here that is bare text rather than an opaque chip, so it is the
+one that can ruin a long draft by sitting on top of it. It is therefore parked in the tool
+row (`card.lastElementChild`) rather than in the editor area. That row is
+`justify-content: space-between`, so its trailing group is the first child whose box starts
+in the right half; the hint is right-aligned to the gap in front of that group and clipped to
+the gap's width. When the gap is under 48 px the hint is dropped instead of overlapped.
+
+This reads only the card's own subtree — the row is `card.lastElementChild`, the same node
+the height measurement already used — and writes nothing outside the plugin's layer.
+
+### Materials, motion and the host
+
+The capsule's surface and every curve and duration are read from the host's own tokens rather
+than invented: `--dsw-specific-menu` over `--dsw-menu-backdrop-filter` — the
+`MenuSurface.module.css` recipe used for every floating layer in DSH —
+`--dsw-elevation-prominent` for a surface that floats above content, and
+`cubic-bezier(.16,1,.3,1)`, the curve the host's own menus enter on. The card's discard
+hairline reuses `--dsw-radius-panel` (the card's own 28 px, rendered as a squircle by the
+app-wide `corner-shape: superellipse(1.5)`).
+
+Entry is a `@starting-style` transition and exit a `data-leaving` attribute, never a
+keyframe, so a gesture reversed mid-flight retargets from its current value. The level meter
+is the shipped voice input's waveform: a 40-slot shift register of RMS samples redrawn at
+20 fps. `tests/render.test.mjs` asserts all of this, so the rules cannot rot silently.
+
 ## Speech recognition
 
 The `speech` remote is **not** part of the default remote assembly — the shipped voice-input
