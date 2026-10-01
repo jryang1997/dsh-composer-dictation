@@ -530,6 +530,32 @@ check(attrs(render(true, IDLE), 'data-on').length === 1, 'and turning it back on
 
 // The chord setting has to reach the gesture itself, or it is only a picture of a setting.
 page = mountSettings();
+
+/*
+ * A missing key renders as the key itself, and this page shipped one: `holdMsLabelHint` reached
+ * a released screenshot because the row built its hint key by appending to the *label* key
+ * instead of the field's own name. This cannot catch every wrong key, but no string a user is
+ * meant to read may look like one.
+ */
+const rendered = [];
+(function walk(node) {
+	if (node === null || node === undefined || typeof node === 'boolean') return;
+	if (typeof node === 'string' || typeof node === 'number') {
+		rendered.push(String(node));
+		return;
+	}
+	if (Array.isArray(node)) {
+		for (const child of node) walk(child);
+		return;
+	}
+	for (const child of node.children ?? []) walk(child);
+})(page);
+const leaked = rendered.filter((text) => /^[a-z]+(?:[A-Z][a-z0-9]+)+$/.test(text));
+check(leaked.length === 0,
+	`no dictionary key leaks into the settings page (saw ${JSON.stringify(leaked)})`);
+check(rendered.some((text) => text.includes('按住多久才开始录音')),
+	'and the hold duration shows its real description');
+
 chooseIn('chord', 'Ctrl + Shift + D');
 inputActions.captured = 0;
 render(true, IDLE);

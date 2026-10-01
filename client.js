@@ -1086,13 +1086,22 @@ window.__ModuleLoader__.load({
 					h('div', { className: 'dsh-htt-set-control' }, control),
 				);
 
-			/** A number field and its row, straight out of the schema so the two cannot drift. */
-			const numberRow = (key, labelKey) => {
+			/**
+			 * A number field and its row, with both strings derived from the field's own name.
+			 *
+			 * Deriving them is what keeps the schema and the dictionary from drifting — but it
+			 * only works if the derivation matches how the keys are actually spelled. It did not:
+			 * this built `holdMsLabel` + `Hint`, while the dictionary says `holdMsHint`, and the
+			 * settings page rendered the raw key as its own description until a screenshot of the
+			 * real page caught it.
+			 */
+			const numberRow = (key) => {
 				const field = CONFIG_FIELDS[key];
+				const label = t(`${key}Label`);
 				return row(
 					key,
-					t(labelKey),
-					t(`${labelKey}Hint`),
+					label,
+					t(`${key}Hint`),
 					h('input', {
 						type: 'number',
 						className: 'dsh-htt-set-number',
@@ -1100,7 +1109,7 @@ window.__ModuleLoader__.load({
 						max: field.max,
 						step: field.step,
 						value: values[key],
-						'aria-label': t(labelKey),
+						'aria-label': label,
 						onChange: (event) => config.set(key, event.target.value),
 					}),
 				);
@@ -1111,8 +1120,8 @@ window.__ModuleLoader__.load({
 				{ className: 'dsh-htt-set' },
 				h('style', null, SETTINGS_STYLES),
 				h('div', { className: 'dsh-htt-set-intro' }, t('settingsIntro')),
-				numberRow('holdMs', 'holdMsLabel'),
-				numberRow('touchHoldMs', 'touchHoldMsLabel'),
+				numberRow('holdMs'),
+				numberRow('touchHoldMs'),
 				row(
 					'motion',
 					t('motionLabel'),
