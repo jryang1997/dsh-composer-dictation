@@ -7,6 +7,37 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-01
+
+### Added
+
+- **A settings page**, under Settings → Plugins → Dictation. Four knobs, and deliberately only
+  four: the hold duration, the motion level, the hover hint, and which keyboard chord to use.
+- The bundle now registers into `plugins.bundle.config`, keyed by package name — the seat the
+  manager offers a bundle for its own page.
+
+### Changed
+
+- **Configuration became a module.** `createConfig` owns the defaults, the clamping, the
+  persistence and the change notification behind a four-method interface — `get` / `set` /
+  `subscribe` / `reset`. These values used to be module constants read straight out of the
+  gesture, and a page that writes them would have scattered storage calls across the whole
+  effect. This is the first of three deepenings; the gesture's thresholds and the surface
+  lifetimes are still inline.
+- **Motion is a preference as well as a signal.** "Calm" applies the same softening as
+  `prefers-reduced-motion` — opacity stays, the movement goes — for people who want it without
+  changing an operating-system setting.
+- The press ring's duration is now driven from configuration instead of being baked into the
+  stylesheet.
+- Chord matching moved from a hard-coded `Ctrl+Shift+Space` to a small catalogue matched on
+  `event.code`, so a keyboard layout that moves the letters around cannot silently break it.
+
+### Notes
+
+- Settings live in the browser's storage, not the DSH profile. That keeps the plugin free of
+  any `@deepseek-ai/dsh-*` dependency — a wrong peer range makes DSH skip the entire bundle,
+  silently — at the cost of not travelling between machines. The reasoning is in the README.
+
 ## [1.2.0] - 2026-10-01
 
 Making good on the three gaps the previous release left open: the gesture had no keyboard
@@ -108,7 +139,8 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0

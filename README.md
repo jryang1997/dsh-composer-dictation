@@ -136,6 +136,32 @@ chip all behave identically.
 The chord is deliberately awkward to hit by accident, and it never claims a keystroke unless
 it actually starts a recording.
 
+### Settings
+
+Settings → Plugins → **Dictation** opens the bundle's own page. Four things live there, and
+deliberately only four:
+
+| Setting | Why it is yours to change |
+|---|---|
+| **Hold duration** (150–800 ms, default 300) | Hands differ more here than at any other threshold |
+| **Motion**: full / calm | Calm keeps the cross-fades and drops movement and scale — the same softening as `prefers-reduced-motion`, but chosen rather than signalled |
+| **Hover hint** on / off | Some want the reminder, some find it noise |
+| **Keyboard shortcut**: off, `Ctrl`+`Shift`+`Space`, `Ctrl`+`Shift`+`D`, `Ctrl`+`Shift`+`M`, `Ctrl`+`Alt`+`Space` | Shortcut conflicts are personal, which is exactly why this one is a choice |
+
+**Deliberately not there**: colours, materials, radii, the drag-to-discard distances, and the
+waveform's physics. Those are the design — a settings page that exposes them has not decided
+anything. The speech provider and language are absent for a different reason: this plugin
+sends neither, so the Host's own Voice input settings govern, and a second copy here could
+only disagree with them.
+
+There is no theme setting because the plugin has no theme of its own: it carries no colour
+and reads every value from the Host's tokens, so it follows light and dark automatically.
+
+Settings are stored **in this browser**, not in your DSH profile. That is a deliberate trade —
+it keeps the plugin free of any `@deepseek-ai/dsh-*` dependency (a wrong peer range makes DSH
+skip the whole bundle, silently) — and these are per-machine preferences rather than
+configuration that should travel. The cost is that they do not follow you to another machine.
+
 ### When something goes wrong
 
 A failure is not a toast. It stays on screen until you deal with it, because it is the only
@@ -287,6 +313,7 @@ be pinned to it. The short version:
 
 | Version | What it was about |
 |---|---|
+| [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | A settings page, and the configuration module it forced into existence |
 | [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | A keyboard equivalent for the gesture, retry in place when the Host hiccups, and failures that wait for an answer instead of flashing past |
 | [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | Recording stopped taking the composer over: a floating capsule, an acknowledged press, real exits, and a motion vocabulary borrowed from the host |
 | [1.0.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0) | The hold-to-talk gesture itself, and everything it needs to be safe to use |
@@ -397,6 +424,28 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 胶囊、波形、丢弃红晕、保留转写的胶囊，行为完全一致。
 
 和弦刻意做得不容易误触，并且**只在真正开始录音时才拦截按键**。
+
+### 设置
+
+「设置 → 插件 → 语音输入」会打开本 bundle 自己的页面。里面只有四项，而且是刻意只有四项：
+
+| 设置项 | 为什么它该由你决定 |
+|---|---|
+| **按住时长**（150–800 ms，默认 300） | 在所有阈值里，这一项最因人而异 |
+| **动效**：完整 / 精简 | 「精简」保留淡入淡出、去掉位移与缩放 —— 和 `prefers-reduced-motion` 是同一种软化，只是一个由你选、一个由系统给 |
+| **悬停提示**：开 / 关 | 有人要这个提醒，有人觉得是噪声 |
+| **键盘快捷键**：关闭、`Ctrl`+`Shift`+`空格`、`Ctrl`+`Shift`+`D`、`Ctrl`+`Shift`+`M`、`Ctrl`+`Alt`+`空格` | 快捷键冲突是私人的，这正是它值得做成选项的原因 |
+
+**刻意不放进去的**：颜色、材质、圆角、上滑丢弃的距离、波形的物理参数。**这些是设计** ——
+一个把这些都摊开的设置页，等于什么都没决定。而语音服务与语言缺席是另一个原因：本插件两个
+都不发送，由 Host 自己的语音输入设置说了算，这里再放一份只会和它打架。
+
+这里没有主题设置，因为**本插件没有自己的主题**：它一个颜色都不自带，所有值都读宿主令牌，
+所以明暗主题自动跟随。
+
+设置存在**这个浏览器里**，不在你的 DSH profile 里。这是个刻意的取舍 —— 它让插件不依赖任何
+`@deepseek-ai/dsh-*` 包（peer range 写错会让 DSH 静默跳过整个 bundle），而这些本来就是
+每台机器的偏好，不是该跟着 profile 走的配置。代价是换台机器不携带。
 
 ### 出错的时候
 
@@ -534,6 +583,7 @@ plugin_manager → action: install_bundle → target: github:jryang1997/dsh-comp
 
 | 版本 | 这一版在解决什么 |
 |---|---|
+| [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | 设置页，以及它逼出来的那个配置模块 |
 | [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | 手势有了键盘等价操作；Host 出错时可以就地重试；失败会停下来等你处理，而不是一闪而过 |
 | [1.1.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.1.0) | 录音不再接管输入框：悬浮胶囊、按下即有反馈、真正的退场，以及一套借自宿主的动效语汇 |
 | [1.0.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.0.0) | 长按说话这个手势本身，以及让它安全可用所需的全部东西 |
