@@ -33,7 +33,9 @@ window.__ModuleLoader__.load({
 		 */
 		const HOLD_MS = 300;
 		/** Movement beyond this disarms the gesture: it was a click, a caret move or a selection. */
-		const ARM_TOLERANCE_PX = 10;		/** Upward travel that arms "release to discard". Leaving the card arms it too. */
+		const ARM_TOLERANCE_PX = 10;
+		/** A finger is not a mouse: it rolls, and it never stays within ten pixels. */
+		const TOUCH_TOLERANCE_PX = 16;		/** Upward travel that arms "release to discard". Leaving the card arms it too. */
 		const CANCEL_ARM_PX = 48;
 		/**
 		 * The disarm threshold, deliberately 10 px *below* the arm threshold. A single
@@ -109,6 +111,7 @@ window.__ModuleLoader__.load({
 		/** The schema: every knob, what a fresh install runs, and how it is offered. */
 		const CONFIG_FIELDS = {
 			holdMs: { fallback: HOLD_MS, min: 150, max: 800, step: 10, kind: 'number' },
+			touchHoldMs: { fallback: 450, min: 250, max: 1200, step: 10, kind: 'number' },
 			motion: { fallback: 'full', oneOf: ['full', 'calm'], kind: 'choice' },
 			hint: { fallback: true, kind: 'switch' },
 			chord: { fallback: 'Control+Shift+Space', oneOf: Object.keys(CHORDS), kind: 'choice' },
@@ -293,6 +296,8 @@ window.__ModuleLoader__.load({
 			settingsIntro: '这些设置只影响本机，不会离开这台电脑。',
 			holdMsLabel: '按住时长',
 			holdMsHint: '按住多久才开始录音。手慢就调长一点，误触多就调短一点。',
+			touchHoldMsLabel: '触屏按住时长',
+			touchHoldMsHint: '手指按住多久才开始录音。触摸屏上长按同时也是选词，所以这里默认更长。',
 			motionLabel: '动效',
 			motionHint: '「精简」会去掉位移与缩放，只保留淡入淡出。',
 			motionFull: '完整',
@@ -334,6 +339,8 @@ window.__ModuleLoader__.load({
 			settingsIntro: 'These settings apply to this machine only; nothing leaves it.',
 			holdMsLabel: 'Hold duration',
 			holdMsHint: 'How long the press must stay still. Longer if your hand is slow, shorter if it fires by accident.',
+			touchHoldMsLabel: 'Hold duration on a touch screen',
+			touchHoldMsHint: 'How long a finger must stay still. Longer by default, because a long press is also how a touch screen selects a word.',
 			motionLabel: 'Motion',
 			motionHint: 'Calm drops movement and scale, and keeps the cross-fades.',
 			motionFull: 'Full',
@@ -1076,26 +1083,33 @@ window.__ModuleLoader__.load({
 					h('div', { className: 'dsh-htt-set-control' }, control),
 				);
 
+			/** A number field and its row, straight out of the schema so the two cannot drift. */
+			const numberRow = (key, labelKey) => {
+				const field = CONFIG_FIELDS[key];
+				return row(
+					key,
+					t(labelKey),
+					t(`${labelKey}Hint`),
+					h('input', {
+						type: 'number',
+						className: 'dsh-htt-set-number',
+						min: field.min,
+						max: field.max,
+						step: field.step,
+						value: values[key],
+						'aria-label': t(labelKey),
+						onChange: (event) => config.set(key, event.target.value),
+					}),
+				);
+			};
+
 			return h(
 				'div',
 				{ className: 'dsh-htt-set' },
 				h('style', null, SETTINGS_STYLES),
 				h('div', { className: 'dsh-htt-set-intro' }, t('settingsIntro')),
-				row(
-					'holdMs',
-					t('holdMsLabel'),
-					t('holdMsHint'),
-					h('input', {
-						type: 'number',
-						className: 'dsh-htt-set-number',
-						min: CONFIG_FIELDS.holdMs.min,
-						max: CONFIG_FIELDS.holdMs.max,
-						step: CONFIG_FIELDS.holdMs.step,
-						value: values.holdMs,
-						'aria-label': t('holdMsLabel'),
-						onChange: (event) => config.set('holdMs', event.target.value),
-					}),
-				),
+				numberRow('holdMs', 'holdMsLabel'),
+				numberRow('touchHoldMs', 'touchHoldMsLabel'),
 				row(
 					'motion',
 					t('motionLabel'),
@@ -1395,6 +1409,8 @@ window.__ModuleLoader__.load({
 					busy: false,
 					cancelled: false,
 					keyboard: false,
+					touch: false,
+					tolerance: ARM_TOLERANCE_PX,
 					retry: null,
 					level: 0,
 					capture: null,
@@ -1562,10 +1578,17 @@ window.__ModuleLoader__.load({
 					}
 				};
 
+				/**
+				 * The gesture's end. Trailing `touch` here rather than in `resetGesture` is
+				 * deliberate: that one also runs when a recording *starts*, which is precisely
+				 * when the touch flag still has work to do.
+				 */
 				const detach = () => {
 					window.removeEventListener('pointermove', onMove, true);
 					window.removeEventListener('pointerup', onUp, true);
 					window.removeEventListener('pointercancel', onCancel, true);
+					state.touch = false;
+					state.tolerance = ARM_TOLERANCE_PX;
 				};
 
 				/**
@@ -1912,6 +1935,16 @@ window.__ModuleLoader__.load({
 					// The retained-transcript chip is a real control; it must not arm the gesture.
 					if (event.target instanceof Element && event.target.closest('.dsh-htt-pending') !== null) return;
 					if (latest.current.props.inputActions === undefined) return;
+					/*
+					 * A finger is a different instrument from a mouse. It rolls, so it needs more
+					 * slop; and a long press on a touch screen is *also* how a word gets selected,
+					 * so the threshold is longer — long enough that a deliberate hold is clearly
+					 * deliberate. Both are settings rather than guesses.
+					 */
+					const touch = event.pointerType === 'touch' || event.pointerType === 'pen';
+					state.touch = touch;
+					state.tolerance = touch ? TOUCH_TOLERANCE_PX : ARM_TOLERANCE_PX;
+					const holdMs = config.get(touch ? 'touchHoldMs' : 'holdMs');
 					state.x = event.clientX;
 					state.y = event.clientY;
 					state.cancelled = false;
@@ -1920,21 +1953,20 @@ window.__ModuleLoader__.load({
 					/*
 					 * Acknowledge the press on the frame it happens. The ring starts drawing at
 					 * the point of contact over the configured hold, so those milliseconds stop
-					 * being a dead zone
-					 * — but it is deliberately faint, because the same gesture also begins a
-					 * caret move or a text selection and must not disturb either.
+					 * being a dead zone — but it is deliberately faint, because the same gesture
+					 * also begins a caret move or a text selection and must not disturb either.
 					 */
 					const rect = card.getBoundingClientRect();
 					clearTimeoutOf('ringExit');
 					patch({
-						arm: { x: event.clientX - rect.left, y: event.clientY - rect.top },
+						arm: { x: event.clientX - rect.left, y: event.clientY - rect.top, holdMs },
 						armLeaving: false,
 						cancelled: false,
 					});
 					state.timer = window.setTimeout(() => {
 						state.timer = 0;
 						void begin();
-					}, config.get('holdMs'));
+					}, holdMs);
 					window.addEventListener('pointermove', onMove, true);
 					window.addEventListener('pointerup', onUp, true);
 					window.addEventListener('pointercancel', onCancel, true);
@@ -1950,7 +1982,7 @@ window.__ModuleLoader__.load({
 					}
 					if (state.timer === 0) return;
 					const travelled = Math.hypot(event.clientX - state.x, event.clientY - state.y);
-					if (travelled > ARM_TOLERANCE_PX) {
+					if (travelled > state.tolerance) {
 						clearTimer();
 						detach();
 						// A click, a caret move or a selection: the arc drains from wherever
@@ -2067,6 +2099,21 @@ window.__ModuleLoader__.load({
 					if (state.active) cancel(true);
 				};
 
+				/*
+				 * A touch long press is also how a browser begins selecting a word, and how the
+				 * desktop shell raises its native context menu — and the composer does nothing to
+				 * stop either. While a *touch* gesture is armed or recording, both are the last
+				 * thing that should happen.
+				 *
+				 * Scoped to touch on purpose: suppressing `selectstart` for the mouse would break
+				 * dragging out a selection, which shares this very card.
+				 */
+				const onSuppress = (event) => {
+					if (!state.touch) return;
+					if (state.timer === 0 && !state.active) return;
+					event.preventDefault();
+				};
+
 				// The tool-row button cannot reach into this closure, so the surface hands it the
 				// two commands it needs. Cleared on unmount, which is what disables the button.
 				session.commands = {
@@ -2080,6 +2127,8 @@ window.__ModuleLoader__.load({
 				card.addEventListener('pointerleave', onLeave);
 				document.addEventListener('keydown', onKeyDown, true);
 				document.addEventListener('keyup', onKeyUp, true);
+				document.addEventListener('contextmenu', onSuppress, true);
+				document.addEventListener('selectstart', onSuppress, true);
 				document.addEventListener('visibilitychange', onVisibility);
 				window.addEventListener('blur', onBlur);
 
@@ -2089,6 +2138,8 @@ window.__ModuleLoader__.load({
 					card.removeEventListener('pointerleave', onLeave);
 					document.removeEventListener('keydown', onKeyDown, true);
 					document.removeEventListener('keyup', onKeyUp, true);
+					document.removeEventListener('contextmenu', onSuppress, true);
+					document.removeEventListener('selectstart', onSuppress, true);
 					document.removeEventListener('visibilitychange', onVisibility);
 					window.removeEventListener('blur', onBlur);
 					window.removeEventListener('resize', measure);
@@ -2156,7 +2207,12 @@ window.__ModuleLoader__.load({
 					ref: root,
 					className: 'dsh-htt-layer',
 					'data-motion': settings.motion,
-					style: { ...layerStyle(box.height), '--dsh-htt-hold': `${settings.holdMs}ms` },
+					// The ring draws over the hold this press actually uses — a finger waits longer
+					// than a mouse, and the arc has to finish exactly when recording begins.
+					style: {
+						...layerStyle(box.height),
+						'--dsh-htt-hold': `${view.arm === null ? settings.holdMs : view.arm.holdMs}ms`,
+					},
 				},
 				h('style', null, STYLES),
 				view.arm !== null &&
