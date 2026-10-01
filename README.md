@@ -146,12 +146,13 @@ microphone does.
 
 ### Settings
 
-Settings → Plugins → **Dictation** opens the bundle's own page. Four things live there, and
-deliberately only four:
+Settings → Plugins → **Dictation** opens the bundle's own page. Five things live there, and
+deliberately only five:
 
 | Setting | Why it is yours to change |
 |---|---|
 | **Hold duration** (150–800 ms, default 300) | Hands differ more here than at any other threshold |
+| **Hold duration on a touch screen** (250–1200 ms, default 450) | A finger rolls, and a long press is also how a touch screen selects a word |
 | **Motion**: full / calm | Calm keeps the cross-fades and drops movement and scale — the same softening as `prefers-reduced-motion`, but chosen rather than signalled |
 | **Hover hint** on / off | Some want the reminder, some find it noise |
 | **Keyboard shortcut**: off, `Ctrl`+`Shift`+`Space`, `Ctrl`+`Shift`+`D`, `Ctrl`+`Shift`+`M`, `Ctrl`+`Alt`+`Space` | Shortcut conflicts are personal, which is exactly why this one is a choice |
@@ -264,8 +265,11 @@ Interface-by-interface notes, verified against the shipped packages, live in
 - **The tool-row button is hidden while the shipped voice input is expanded.** It lives in
   `conversation.input.left`, and the composer hides that whole group when the official
   microphone's activity expands — so during an official recording, the chord is the only way in.
-- **Mouse-first.** Touch input is untested: on a touch screen a long press also drives text
-  selection, so the thresholds would probably need tuning there.
+- **Touch is handled defensively, not verified.** A touch press gets its own, longer hold and a
+  wider slop, and suppresses the word selection and native context menu that a long press
+  otherwise triggers — the composer itself does nothing about either. That last part depends on
+  `preventDefault()` reaching the desktop shell's context-menu handler, which has **not** been
+  confirmed on real hardware: this plugin has never been driven from a touch screen.
 - **The hint needs room.** It lives in the tool row's empty middle, so on a very narrow
   composer — where the mode chips and the model selector leave no gap — it is dropped
   rather than allowed to overlap a control.
@@ -320,6 +324,7 @@ be pinned to it. The short version:
 
 | Version | What it was about |
 |---|---|
+| [1.5.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.0) | A separate hold for a finger, and suppression of the word selection and native menu a long press otherwise triggers — the host does nothing about touch at all |
 | [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | A focusable microphone button in the tool row — the keyboard entry finally becomes findable |
 | [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | A settings page, and the configuration module it forced into existence |
 | [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | A keyboard equivalent for the gesture, retry in place when the Host hiccups, and failures that wait for an answer instead of flashing past |
@@ -440,11 +445,12 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 
 ### 设置
 
-「设置 → 插件 → 语音输入」会打开本 bundle 自己的页面。里面只有四项，而且是刻意只有四项：
+「设置 → 插件 → 语音输入」会打开本 bundle 自己的页面。里面只有五项，而且是刻意只有五项：
 
 | 设置项 | 为什么它该由你决定 |
 |---|---|
 | **按住时长**（150–800 ms，默认 300） | 在所有阈值里，这一项最因人而异 |
+| **触屏按住时长**（250–1200 ms，默认 450） | 手指会滚，而且触摸屏上的长按同时也是选词的起手 |
 | **动效**：完整 / 精简 | 「精简」保留淡入淡出、去掉位移与缩放 —— 和 `prefers-reduced-motion` 是同一种软化，只是一个由你选、一个由系统给 |
 | **悬停提示**：开 / 关 | 有人要这个提醒，有人觉得是噪声 |
 | **键盘快捷键**：关闭、`Ctrl`+`Shift`+`空格`、`Ctrl`+`Shift`+`D`、`Ctrl`+`Shift`+`M`、`Ctrl`+`Alt`+`空格` | 快捷键冲突是私人的，这正是它值得做成选项的原因 |
@@ -547,7 +553,10 @@ dsh plugin --profile <profile> add <克隆下来的绝对路径>
 
 - **官方语音展开时，工具行的按钮会被隐藏。** 它住在 `conversation.input.left`，而输入框在官方
   麦克风的 activity 展开时会把这一整组隐藏 —— 所以官方录音期间，和弦是唯一入口。
-- **以鼠标为主。** 触摸屏未验证：触摸长按同时会驱动文本选择，阈值大概需要另调。
+- **触摸是防御性处理过的，但没有在真机上验证过。** 触摸按压有自己的更长阈值和更宽的容差，并且会
+  拦掉长按本来会触发的选词与原生右键菜单 —— 宿主自己对这两件事都没有任何处理。后半句依赖
+  `preventDefault()` 能否抵达桌面壳的右键菜单处理器，**这一点没有在真实硬件上确认过**：
+  本插件从未被触摸屏驱动过。
 - **提示行需要空间。** 它待在工具行中间的空档里，所以输入框特别窄时（模式按钮与模型选择器
   之间挤不出空档）它会被直接省掉，而不是允许它压住控件。
 - 依赖 DSH 的两个内部接口 —— `conversation.input.overlay` 座位与 `speech` 远程命名空间 ——
@@ -595,6 +604,7 @@ plugin_manager → action: install_bundle → target: github:jryang1997/dsh-comp
 
 | 版本 | 这一版在解决什么 |
 |---|---|
+| [1.5.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.5.0) | 手指有自己的一套阈值，并且拦掉长按本来会触发的选词与原生菜单 —— 宿主对触摸完全不管 |
 | [1.4.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.4.0) | 工具行里一个可聚焦的麦克风按钮 —— 键盘入口终于变得找得到 |
 | [1.3.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.3.0) | 设置页，以及它逼出来的那个配置模块 |
 | [1.2.0](https://github.com/jryang1997/dsh-composer-dictation/releases/tag/v1.2.0) | 手势有了键盘等价操作；Host 出错时可以就地重试；失败会停下来等你处理，而不是一闪而过 |

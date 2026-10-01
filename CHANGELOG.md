@@ -7,6 +7,38 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-01
+
+The gesture was built for a mouse and never tuned for a finger. The host does nothing about
+touch at all, so the plugin has to.
+
+### Added
+
+- **A separate touch threshold.** A touch press gets its own hold (default 450 ms, configurable
+  from 250 to 1200) and a wider slop — a finger rolls, and a long press on a touch screen is
+  *also* how a word gets selected, so the threshold has to be long enough that a deliberate
+  hold is unmistakably deliberate.
+- **Suppression of what a long press otherwise triggers.** While a touch gesture is armed or
+  recording, `contextmenu` and `selectstart` are cancelled in the capture phase. Neither is
+  handled anywhere near the composer — the desktop shell raises a native context menu from the
+  main process, and Lexical writes `user-select: text` onto the editor — so the collision is
+  real rather than theoretical.
+- The press ring now draws over the hold the press actually uses, so the arc still finishes at
+  the moment recording begins.
+
+### Notes
+
+- Suppression is scoped to **touch** on purpose: cancelling `selectstart` for the mouse would
+  break dragging a selection out of the same card.
+- `touch-action` is not the tool here, and deliberately not used: it governs panning and
+  zooming, not long-press selection.
+
+### Known limitation
+
+Whether `preventDefault()` on the DOM `contextmenu` event reaches the desktop shell's
+main-process context-menu handler has **not** been confirmed on real hardware. This plugin has
+never been driven from a touch screen. The README says so in place of pretending otherwise.
+
 ## [1.4.0] - 2026-10-01
 
 The keyboard entry from 1.2.0 was real but invisible: a chord cannot be found by pressing Tab.
@@ -164,7 +196,8 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/jryang1997/dsh-composer-dictation/compare/v1.1.0...v1.2.0
