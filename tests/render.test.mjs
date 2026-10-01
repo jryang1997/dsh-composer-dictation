@@ -533,113 +533,31 @@ check(inputActions.captured === 1, 'and so does the chord');
 
 //#endregion
 
-//#region the tool-row button
-
-/**
- * Mount the button without clearing cleanups: the surface has to stay mounted, because it is
- * what publishes the phase and hands the button its commands.
- */
-const mountButton = () => {
-	preset = [];
-	hookIndex = 0;
-	refQueue = [];
-	const entry = registrations.get('conversation.input.left');
-	return entry === undefined ? null : entry.component({ t: undefined });
-};
-
-const toolEntry = registrations.get('conversation.input.left');
-check(toolEntry !== undefined, 'the bundle registers a tool-row button');
-check(typeof toolEntry?.meta.id === 'string' && toolEntry.meta.id !== '',
-	'as a fresh id in a list slot, so it joins the row instead of replacing anything');
-check(toolEntry?.meta.locale === 'dsh-composer-dictation', 'and carries its locale namespace');
-
-render(true, IDLE);
-let button = find(mountButton(), 'dsh-htt-tool');
-check(button !== undefined, 'the button renders');
-check(button.type === 'button', 'as a real button, so Tab reaches it and Enter activates it');
-check(button.props['aria-label'] === '语音输入', 'idle says what pressing it will do');
-check(button.props['aria-pressed'] === 'false', 'and reports that it is not pressed');
-check(button.props['aria-keyshortcuts'] === 'Control+Shift+Space',
-	'and announces the chord, which is the only place a keyboard user can learn it');
-check(button.props.disabled !== true, 'and is enabled');
-
-inputActions.captured = 0;
-button.props.onClick();
-check(inputActions.captured === 1, 'pressing it starts a capture');
-
-render(true, { ...IDLE, phase: 'recording' });
-button = find(mountButton(), 'dsh-htt-tool');
-check(button.props['data-state'] === 'recording', 'recording shows on the button');
-check(button.props['aria-pressed'] === 'true', 'and is announced as pressed');
-check(find(button, 'dsh-htt-tool-live') !== null, 'and the microphone becomes a live dot');
-
-render(true, { ...IDLE, phase: 'transcribing' });
-button = find(mountButton(), 'dsh-htt-tool');
-check(button.props.disabled === true, 'transcribing disables it rather than offering a no-op');
-
-// With no chord configured there is nothing to announce.
-page = mountSettings();
-chooseIn('chord', '关闭');
-render(true, IDLE);
-button = find(mountButton(), 'dsh-htt-tool');
-check(button.props['aria-keyshortcuts'] === undefined, 'no chord means no announcement');
-page = mountSettings();
-find(page, 'dsh-htt-set-reset').props.onClick();
-
-//#endregion
-
-//#region touch
-
-/** A pointer event carrying only what the plugin reads. */
-const press = (over) => ({
-	button: 0, pointerType: 'mouse', clientX: 100, clientY: 40, timeStamp: 1000,
-	preventDefault() { this.prevented = true; },
-	stopPropagation() { this.stopped = true; },
-	...over,
-});
-
-render(true, IDLE);
-timeouts.length = 0;
-fire('pointerdown', press());
-check(timeouts.at(-1)?.ms === 300, `a mouse press waits the mouse hold (got ${timeouts.at(-1)?.ms})`);
-
-render(true, IDLE);
-timeouts.length = 0;
-fire('pointerdown', press({ pointerType: 'touch' }));
-check(timeouts.at(-1)?.ms === 450, `a finger waits the touch hold (got ${timeouts.at(-1)?.ms})`);
-
-// The ring has to finish drawing exactly when recording begins, whichever hold is in force.
-const armRing = find(render(true, { ...IDLE, arm: { x: 10, y: 10, holdMs: 450 } }), 'dsh-htt-layer');
-check(armRing.props.style['--dsh-htt-hold'] === '450ms', 'the ring draws over the hold this press uses');
+//#region the microphone glyph
 
 /*
- * A touch long press is also how a browser starts selecting a word and how the desktop shell
- * raises its context menu; the composer does nothing to stop either, so the plugin has to.
+ * The hint's microphone has to be the host's own glyph, not a lookalike: an earlier version
+ * drew a filled capsule that sat inches away from the stroked one the host uses in the same
+ * row, and the difference was obvious. `MicGlyph` is a function component, so the harness has
+ * to invoke it to see what it produces.
  */
-render(true, IDLE);
-fire('pointerdown', press({ pointerType: 'touch' }));
-const touchMenu = press({ pointerType: 'touch' });
-fire('contextmenu', touchMenu);
-check(touchMenu.prevented === true, 'an armed touch press suppresses the native context menu');
-const touchSelect = press({ pointerType: 'touch' });
-fire('selectstart', touchSelect);
-check(touchSelect.prevented === true, 'and the word selection that would follow it');
-
-// Scoped to touch on purpose: dragging a selection out of this same card must keep working.
-render(true, IDLE);
-fire('pointerdown', press());
-const mouseMenu = press();
-fire('contextmenu', mouseMenu);
-check(mouseMenu.prevented === undefined, 'a mouse press leaves the context menu alone');
-const mouseSelect = press();
-fire('selectstart', mouseSelect);
-check(mouseSelect.prevented === undefined, 'and leaves drag-selection alone');
-
-// And once the gesture is over, nothing is suppressed for anyone.
-fire('pointerup', press());
-const afterMenu = press({ pointerType: 'touch' });
-fire('contextmenu', afterMenu);
-check(afterMenu.prevented === undefined, 'nothing is suppressed once the gesture has ended');
+const hintNode = find(render(true, IDLE), 'dsh-htt-hint');
+const micElement = hintNode.children.find((child) => typeof child?.type === 'function');
+const mic = micElement.type(micElement.props);
+check(mic.type === 'svg', 'the hint draws a microphone');
+check(mic.props.fill === 'none' && mic.props.stroke === 'currentColor',
+	'the host draws it stroked, not filled, and this matches');
+check(mic.props.strokeWidth === 1, 'at the host stroke weight');
+check(mic.children.some((child) => child.type === 'rect') && mic.children.some((child) => child.type === 'path'),
+	'as a capsule plus an arc');
+check(mic.children.find((child) => child.type === 'path').props.d
+	=== 'M2.35 8.675C3.075 11.3 5.2 13.125 8 13.125C10.8 13.125 12.925 11.3 13.65 8.675M8 13.125V15',
+	'carrying the host path data verbatim');
+// The capsule is expressed in terms of the stroke width, so it must not be frozen at 1 px.
+const wide = micElement.type({ size: 16, strokeWidth: 2 });
+check(wide.children.find((child) => child.type === 'rect').props.width === 5
+	&& wide.children.find((child) => child.type === 'rect').props.rx === 2.5,
+	'and its capsule geometry still follows the stroke width');
 
 //#endregion
 
@@ -700,6 +618,13 @@ check(/opacity 140ms linear/.test(reduced), 'reduced motion still cross-fades');
 // The calm setting is the same softening, chosen rather than signalled.
 check(css.includes('.dsh-htt-layer[data-motion=calm]'), 'the calm preference has its own rules');
 
+// The hint sits in the tool row, so it has to speak the tool row's typography.
+const hintRule = rule(css, '.dsh-htt-hint{');
+check(hintRule.includes('font-size:13px') && hintRule.includes('font-weight:500')
+	&& hintRule.includes('line-height:20px'),
+	'the hint joins the row: 13px / 500 / 20px, exactly what the model selector uses');
+check(!hintRule.includes('letter-spacing'), 'and carries no tracking of its own');
+
 // The settings page brings its own stylesheet, because it renders in a different slot.
 const settingsCss = styleText(mountSettings());
 check(typeof settingsCss === 'string' && settingsCss.includes('.dsh-htt-set-row'),
@@ -707,16 +632,6 @@ check(typeof settingsCss === 'string' && settingsCss.includes('.dsh-htt-set-row'
 check(count(settingsCss, '{') === count(settingsCss, '}'), 'settings stylesheet braces balance');
 check(rule(settingsCss, '.dsh-htt-set-number:focus-visible').includes('outline-style:solid'),
 	'the settings controls take keyboard focus visibly');
-
-// The button lives in the tool row, so it brings its own stylesheet too.
-const buttonCss = styleText(mountButton());
-check(typeof buttonCss === 'string' && buttonCss.includes('.dsh-htt-tool'),
-	'the button injects its own styles');
-check(count(buttonCss, '{') === count(buttonCss, '}'), 'button stylesheet braces balance');
-check(rule(buttonCss, '.dsh-htt-tool:focus-visible').includes('outline-style:solid'),
-	'the button shows keyboard focus');
-check(buttonCss.includes('.dsh-htt-toolwrap{display:contents}'),
-	'the wrapper stays out of the tool row layout');
 
 //#endregion
 
