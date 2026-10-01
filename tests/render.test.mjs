@@ -130,6 +130,8 @@ let preset = [];
 let hookIndex = 0;
 let refQueue = [];
 let cleanups = [];
+/** Every state update the component makes, so measurement can be observed rather than assumed. */
+const setCalls = [];
 const React = {
 	createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
 	// The refs the component asks for are (root, wave); both need to look mounted.
@@ -138,7 +140,7 @@ const React = {
 		const given = preset[hookIndex];
 		hookIndex += 1;
 		const initial = typeof value === 'function' ? value() : value;
-		return [given === undefined ? initial : given, () => undefined];
+		return [given === undefined ? initial : given, (next) => setCalls.push(next)];
 	},
 	useEffect: (fn) => {
 		const cleanup = fn();
@@ -303,6 +305,7 @@ const render = (hovered, view, box = BOX, props = {}) => {
 	for (const cleanup of cleanups) cleanup();
 	cleanups = [];
 	listeners.clear();
+	setCalls.length = 0;
 	preset = [hovered, view, box];
 	hookIndex = 0;
 	refQueue = [{ current: fakeCard() }, { current: { querySelectorAll: () => [] } }];
@@ -329,6 +332,21 @@ check(!names.includes('dsh-htt-ring'), 'no press ring without a press');
 // Idle with a narrow tool row: the hint must not switch on over the controls.
 tree = render(true, IDLE, { ...BOX, hintMax: 20 });
 check(attrs(tree, 'data-on').length === 0, 'the hint stays off when the tool row has no room');
+
+/*
+ * Vertical alignment is the one thing about the hint that cannot be eyeballed from the
+ * markup, so it is asserted twice: that the measurement produces a centre, and that the
+ * centre -- not the row's box -- is what positions the hint.
+ */
+const measured = setCalls.find((call) => call !== null && typeof call === 'object' && 'hintCentre' in call);
+check(measured?.hintCentre === 65,
+	`the hint is centred on the control it sits beside (got ${measured?.hintCentre})`);
+const centredHint = find(render(true, IDLE, { ...BOX, hintCentre: 21 }), 'dsh-htt-hint');
+check(centredHint.props.style.top === '11px', 'and that centre is what positions it, not the row box');
+check(centredHint.props.style.bottom === undefined, 'with no second, conflicting offset');
+const unmeasuredHint = find(render(true, IDLE, { ...BOX, hintCentre: null }), 'dsh-htt-hint');
+check(unmeasuredHint.props.style.bottom !== undefined && unmeasuredHint.props.style.top === undefined,
+	'and it falls back to the row box before anything has been measured');
 
 // Recording: a floating capsule, and the composer itself is left alone.
 tree = render(true, { ...IDLE, phase: 'recording' });
@@ -620,10 +638,12 @@ check(css.includes('.dsh-htt-layer[data-motion=calm]'), 'the calm preference has
 
 // The hint sits in the tool row, so it has to speak the tool row's typography.
 const hintRule = rule(css, '.dsh-htt-hint{');
-check(hintRule.includes('font-size:13px') && hintRule.includes('font-weight:500')
+check(hintRule.includes('font-size:13px') && hintRule.includes('font-weight:400')
 	&& hintRule.includes('line-height:20px'),
-	'the hint joins the row: 13px / 500 / 20px, exactly what the model selector uses');
+	'the hint joins the row: 13px / 400 / 20px, exactly what the model selector uses');
 check(!hintRule.includes('letter-spacing'), 'and carries no tracking of its own');
+// The 500-weight rule in the host's InputBar stylesheet is dead CSS; copying it was a mistake.
+check(!hintRule.includes('font-weight:500'), 'and is not weighted like a chip');
 
 // The settings page brings its own stylesheet, because it renders in a different slot.
 const settingsCss = styleText(mountSettings());
