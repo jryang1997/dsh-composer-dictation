@@ -23,6 +23,13 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(here, '..', 'client.js'), 'utf8');
 
+/*
+ * The plugin asks `event.target instanceof Element`, and Node has no DOM at all. Declaring
+ * the two constructors is enough to let the pointer path run under the harness.
+ */
+globalThis.Element = class Element {};
+globalThis.Node = class Node {};
+
 const failures = [];
 const check = (condition, label) => {
 	if (!condition) failures.push(label);
@@ -54,6 +61,9 @@ const fire = (type, event) => {
 //#region the module loader handshake
 
 let loaded = null;
+/** Timer ids are recorded rather than stubbed away: the hold duration is a real assertion. */
+const timeouts = [];
+let timerId = 0;
 const fakeDocument = {
 	hidden: false,
 	addEventListener: listen,
@@ -62,7 +72,11 @@ const fakeDocument = {
 const fakeWindow = {
 	__ModuleLoader__: { load: (module) => { loaded = module; } },
 	btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
-	setTimeout: () => 0,
+	setTimeout: (fn, ms) => {
+		timerId += 1;
+		timeouts.push({ id: timerId, fn, ms });
+		return timerId;
+	},
 	clearTimeout: () => undefined,
 	requestAnimationFrame: () => 0,
 	cancelAnimationFrame: () => undefined,
@@ -571,6 +585,61 @@ button = find(mountButton(), 'dsh-htt-tool');
 check(button.props['aria-keyshortcuts'] === undefined, 'no chord means no announcement');
 page = mountSettings();
 find(page, 'dsh-htt-set-reset').props.onClick();
+
+//#endregion
+
+//#region touch
+
+/** A pointer event carrying only what the plugin reads. */
+const press = (over) => ({
+	button: 0, pointerType: 'mouse', clientX: 100, clientY: 40, timeStamp: 1000,
+	preventDefault() { this.prevented = true; },
+	stopPropagation() { this.stopped = true; },
+	...over,
+});
+
+render(true, IDLE);
+timeouts.length = 0;
+fire('pointerdown', press());
+check(timeouts.at(-1)?.ms === 300, `a mouse press waits the mouse hold (got ${timeouts.at(-1)?.ms})`);
+
+render(true, IDLE);
+timeouts.length = 0;
+fire('pointerdown', press({ pointerType: 'touch' }));
+check(timeouts.at(-1)?.ms === 450, `a finger waits the touch hold (got ${timeouts.at(-1)?.ms})`);
+
+// The ring has to finish drawing exactly when recording begins, whichever hold is in force.
+const armRing = find(render(true, { ...IDLE, arm: { x: 10, y: 10, holdMs: 450 } }), 'dsh-htt-layer');
+check(armRing.props.style['--dsh-htt-hold'] === '450ms', 'the ring draws over the hold this press uses');
+
+/*
+ * A touch long press is also how a browser starts selecting a word and how the desktop shell
+ * raises its context menu; the composer does nothing to stop either, so the plugin has to.
+ */
+render(true, IDLE);
+fire('pointerdown', press({ pointerType: 'touch' }));
+const touchMenu = press({ pointerType: 'touch' });
+fire('contextmenu', touchMenu);
+check(touchMenu.prevented === true, 'an armed touch press suppresses the native context menu');
+const touchSelect = press({ pointerType: 'touch' });
+fire('selectstart', touchSelect);
+check(touchSelect.prevented === true, 'and the word selection that would follow it');
+
+// Scoped to touch on purpose: dragging a selection out of this same card must keep working.
+render(true, IDLE);
+fire('pointerdown', press());
+const mouseMenu = press();
+fire('contextmenu', mouseMenu);
+check(mouseMenu.prevented === undefined, 'a mouse press leaves the context menu alone');
+const mouseSelect = press();
+fire('selectstart', mouseSelect);
+check(mouseSelect.prevented === undefined, 'and leaves drag-selection alone');
+
+// And once the gesture is over, nothing is suppressed for anyone.
+fire('pointerup', press());
+const afterMenu = press({ pointerType: 'touch' });
+fire('contextmenu', afterMenu);
+check(afterMenu.prevented === undefined, 'nothing is suppressed once the gesture has ended');
 
 //#endregion
 
