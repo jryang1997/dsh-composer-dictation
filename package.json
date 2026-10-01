@@ -40,8 +40,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node tests/locales.test.mjs",
-    "check": "node --check index.js && node --check client.js && node tests/locales.test.mjs"
+    "test": "node tests/locales.test.mjs && node tests/render.test.mjs",
+    "check": "node --check index.js && node --check client.js && node tests/locales.test.mjs && node tests/render.test.mjs"
   },
   "dsh": {
     "bundle": {
