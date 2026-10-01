@@ -25,11 +25,13 @@ window.__ModuleLoader__.load({
 		const SLOT = 'conversation.input.overlay';
 		const ENTRY = 'composer-dictation';
 
-		/** How long the pointer must stay still before the composer becomes a microphone. */
+		/**
+		 * How long the pointer must stay still before the composer becomes a microphone. The
+		 * live value comes from settings; this is only the stylesheet's fallback.
+		 */
 		const HOLD_MS = 300;
 		/** Movement beyond this disarms the gesture: it was a click, a caret move or a selection. */
-		const ARM_TOLERANCE_PX = 10;
-		/** Upward travel that arms "release to discard". Leaving the card arms it too. */
+		const ARM_TOLERANCE_PX = 10;		/** Upward travel that arms "release to discard". Leaving the card arms it too. */
 		const CANCEL_ARM_PX = 48;
 		/**
 		 * The disarm threshold, deliberately 10 px *below* the arm threshold. A single
@@ -70,6 +72,168 @@ window.__ModuleLoader__.load({
 		const RING_RADIUS = 15.5;
 		const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
+		//#region config
+
+		/**
+		 * Every tunable, in one place.
+		 *
+		 * The settings page is what forced this module into existence. These values used to be
+		 * module constants read straight out of the gesture, and a page that writes them would
+		 * have scattered storage calls across the whole effect. One small interface —
+		 * get / set / subscribe / reset — keeps the defaults, the clamping, the persistence and
+		 * the notification behind it, so no caller has to know where a value came from.
+		 *
+		 * Storage is the browser's, not the Host's settings service. Deliberate: it keeps the
+		 * plugin free of any `@deepseek-ai/dsh-*` dependency (a wrong peer range makes DSH skip
+		 * the entire bundle, silently, with nothing on screen to say why), and these are
+		 * per-machine preferences rather than configuration that should travel with a profile.
+		 */
+		const PKG = '@jryang1997/dsh-composer-dictation';
+		const CONFIG_KEY = 'dsh-composer-dictation.config';
+		const CONFIG_SLOT = 'plugins.bundle.config';
+
+		/**
+		 * The chords offered in settings. Matching is on `event.code`, which is the physical key,
+		 * so a layout that moves the letters around cannot silently break the shortcut.
+		 */
+		const CHORDS = {
+			off: null,
+			'Control+Shift+Space': { ctrl: true, shift: true, alt: false, code: 'Space', label: 'Ctrl + Shift + Space' },
+			'Control+Shift+D': { ctrl: true, shift: true, alt: false, code: 'KeyD', label: 'Ctrl + Shift + D' },
+			'Control+Shift+M': { ctrl: true, shift: true, alt: false, code: 'KeyM', label: 'Ctrl + Shift + M' },
+			'Control+Alt+Space': { ctrl: true, shift: false, alt: true, code: 'Space', label: 'Ctrl + Alt + Space' },
+		};
+
+		/** The schema: every knob, what a fresh install runs, and how it is offered. */
+		const CONFIG_FIELDS = {
+			holdMs: { fallback: HOLD_MS, min: 150, max: 800, step: 10, kind: 'number' },
+			motion: { fallback: 'full', oneOf: ['full', 'calm'], kind: 'choice' },
+			hint: { fallback: true, kind: 'switch' },
+			chord: { fallback: 'Control+Shift+Space', oneOf: Object.keys(CHORDS), kind: 'choice' },
+		};
+
+		const configDefaults = () => Object.fromEntries(
+			Object.entries(CONFIG_FIELDS).map(([key, field]) => [key, field.fallback]),
+		);
+
+		/** Fit one stored value to its field, falling back rather than throwing. */
+		const coerceConfig = (field, value) => {
+			if (field.oneOf !== undefined) return field.oneOf.includes(value) ? value : field.fallback;
+			if (field.kind === 'switch') return typeof value === 'boolean' ? value : field.fallback;
+			const number = typeof value === 'number' ? value : Number.parseFloat(value);
+			if (!Number.isFinite(number)) return field.fallback;
+			return Math.round(Math.min(field.max, Math.max(field.min, number)));
+		};
+
+		/** A blocked origin or a private window must not take the plugin down with it. */
+		const safeStorage = (() => {
+			try {
+				const store = window.localStorage;
+				store.setItem(`${CONFIG_KEY}.probe`, '1');
+				store.removeItem(`${CONFIG_KEY}.probe`);
+				return store;
+			} catch (error) {
+				const memory = new Map();
+				return {
+					getItem: (key) => (memory.has(key) ? memory.get(key) : null),
+					setItem: (key, value) => memory.set(key, value),
+					removeItem: (key) => memory.delete(key),
+				};
+			}
+		})();
+
+		/** Read, clamp, persist and broadcast — the whole of the plugin's mutable configuration. */
+		function createConfig(storage) {
+			const listeners = new Set();
+
+			const load = () => {
+				const next = configDefaults();
+				try {
+					const raw = storage.getItem(CONFIG_KEY);
+					if (raw === null) return next;
+					const stored = JSON.parse(raw);
+					if (stored === null || typeof stored !== 'object') return next;
+					for (const [key, field] of Object.entries(CONFIG_FIELDS)) {
+						if (key in stored) next[key] = coerceConfig(field, stored[key]);
+					}
+				} catch (error) {
+					// A corrupt store is not worth failing over: the defaults are always a
+					// working plugin, and the next write repairs the file.
+				}
+				return next;
+			};
+
+			let values = load();
+
+			const persist = () => {
+				try {
+					storage.setItem(CONFIG_KEY, JSON.stringify(values));
+				} catch (error) {
+					/* read-only here; the session still runs on the values held in memory */
+				}
+			};
+
+			const publish = (key) => {
+				for (const listener of listeners) listener(key, values);
+			};
+
+			return {
+				get: (key) => values[key],
+				all: () => ({ ...values }),
+				set(key, value) {
+					const field = CONFIG_FIELDS[key];
+					if (field === undefined) return;
+					const next = coerceConfig(field, value);
+					if (values[key] === next) return;
+					values = { ...values, [key]: next };
+					persist();
+					publish(key);
+				},
+				reset() {
+					values = configDefaults();
+					persist();
+					publish(null);
+				},
+				subscribe(listener) {
+					listeners.add(listener);
+					return () => listeners.delete(listener);
+				},
+			};
+		}
+
+		const config = createConfig(safeStorage);
+
+		/** The chord a keydown is asking for, or null when it matches none of them. */
+		const chordOf = (event) => {
+			for (const [name, spec] of Object.entries(CHORDS)) {
+				if (spec === null) continue;
+				// `=== true`, so a synthesised or partial event with a missing modifier reads as
+				// "not held" rather than as "held differently".
+				if ((event.ctrlKey === true) !== spec.ctrl) continue;
+				if ((event.shiftKey === true) !== spec.shift) continue;
+				if ((event.altKey === true) !== spec.alt) continue;
+				if (event.metaKey === true) continue;
+				if (event.code === spec.code || (spec.code === 'Space' && event.key === ' ')) return name;
+			}
+			return null;
+		};
+
+		/** Only the configured chord counts: choosing Ctrl+Shift+D does not leave Space armed. */
+		const isChord = (event) => {
+			const wanted = config.get('chord');
+			return wanted !== 'off' && chordOf(event) === wanted;
+		};
+
+		/** Any key that belongs to the configured chord, which is what ends a held one. */
+		const isChordKey = (event) => {
+			const spec = CHORDS[config.get('chord')];
+			if (spec === undefined || spec === null) return false;
+			return event.key === 'Control' || event.key === 'Shift' || event.key === 'Alt'
+				|| event.code === spec.code || (spec.code === 'Space' && event.key === ' ');
+		};
+
+		//#endregion
+
 		/** Handles captured in `apply`, so a slot entry that receives no injected props still works. */
 		const runtime = { speech: null, limits: null };
 
@@ -93,6 +257,23 @@ window.__ModuleLoader__.load({
 			unavailable: '当前环境无法录音',
 			permission: '麦克风不可用，请在系统设置中允许后重试',
 			tooLarge: '录音超出语音服务上限，请说短一点',
+			settingsTitle: '语音输入',
+			settingsIntro: '这些设置只影响本机，不会离开这台电脑。',
+			holdMsLabel: '按住时长',
+			holdMsHint: '按住多久才开始录音。手慢就调长一点，误触多就调短一点。',
+			motionLabel: '动效',
+			motionHint: '「精简」会去掉位移与缩放，只保留淡入淡出。',
+			motionFull: '完整',
+			motionCalm: '精简',
+			hintLabel: '悬停提示',
+			hintHint: '鼠标移入输入框时，在工具行中间显示那一行提示。',
+			switchOn: '开',
+			switchOff: '关',
+			chordLabel: '键盘快捷键',
+			chordHint: '按住这个组合键同样可以说话，松开即转写。',
+			chordOff: '关闭',
+			settingsReset: '恢复默认',
+			settingsLocal: '单位：毫秒',
 		};
 		const en = {
 			hint: 'Hold to dictate · swipe up to cancel',
@@ -114,6 +295,23 @@ window.__ModuleLoader__.load({
 			unavailable: 'This environment cannot record audio',
 			permission: 'Microphone unavailable; allow access in system settings and retry',
 			tooLarge: 'That recording is longer than the speech service accepts',
+			settingsTitle: 'Dictation',
+			settingsIntro: 'These settings apply to this machine only; nothing leaves it.',
+			holdMsLabel: 'Hold duration',
+			holdMsHint: 'How long the press must stay still. Longer if your hand is slow, shorter if it fires by accident.',
+			motionLabel: 'Motion',
+			motionHint: 'Calm drops movement and scale, and keeps the cross-fades.',
+			motionFull: 'Full',
+			motionCalm: 'Calm',
+			hintLabel: 'Hover hint',
+			hintHint: 'Show the hint line in the middle of the tool row when the pointer enters the composer.',
+			switchOn: 'On',
+			switchOff: 'Off',
+			chordLabel: 'Keyboard shortcut',
+			chordHint: 'Hold this chord to dictate without a mouse; letting go transcribes.',
+			chordOff: 'Off',
+			settingsReset: 'Restore defaults',
+			settingsLocal: 'milliseconds',
 		};
 
 		/**
@@ -614,6 +812,25 @@ window.__ModuleLoader__.load({
   .dsh-htt-ring,.dsh-htt-ring-arc{transition-duration:1ms!important}
   @starting-style{.dsh-htt-bubble{scale:none; opacity:0}}
 }
+/*
+ * The same softening as the prefers-reduced-motion query above, but chosen rather than
+ * signalled. The duplication is deliberate: one is an operating-system preference and the
+ * other is a setting, and CSS cannot share a declaration list across a media boundary.
+ */
+.dsh-htt-layer[data-motion=calm] .dsh-htt-hint,
+.dsh-htt-layer[data-motion=calm] .dsh-htt-pending,
+.dsh-htt-layer[data-motion=calm] .dsh-htt-notice,
+.dsh-htt-layer[data-motion=calm] .dsh-htt-row > *{
+  translate:none!important; scale:none!important;
+  transition:opacity 140ms linear!important;
+}
+.dsh-htt-layer[data-motion=calm] .dsh-htt-bubble{scale:none!important; transition:opacity 140ms linear}
+.dsh-htt-layer[data-motion=calm] .dsh-htt-pill{translate:none!important}
+.dsh-htt-layer[data-motion=calm] .dsh-htt-wave,
+.dsh-htt-layer[data-motion=calm] .dsh-htt-cross{scale:none!important; transition:opacity 140ms linear}
+.dsh-htt-layer[data-motion=calm] .dsh-htt-ring,
+.dsh-htt-layer[data-motion=calm] .dsh-htt-ring-arc{transition-duration:1ms!important}
+
 @media (prefers-reduced-transparency:reduce){
   .dsh-htt-material{
     background:var(--dsw-specific-input-major,var(--dsw-alias-bg-layer-2));
@@ -752,6 +969,178 @@ window.__ModuleLoader__.load({
 
 		//#endregion
 
+		//#region settings page
+
+		/**
+		 * The page Settings → Plugins opens for this bundle.
+		 *
+		 * The Host offers `plugins.bundle.config` and a form primitive library, but that library
+		 * renders text inputs only — no switch, no select, no stepper. Rather than pull a
+		 * `@deepseek-ai/dsh-*` runtime dependency in for the skin (a wrong peer range makes DSH
+		 * skip the whole bundle, silently), the controls are built here out of the same theme
+		 * tokens everything else uses. They look native because the tokens are native.
+		 */
+		const SETTINGS_STYLES = `
+.dsh-htt-set{display:flex; flex-direction:column; gap:2px; font-size:13px; line-height:18px; color:var(--dsw-alias-label-primary)}
+.dsh-htt-set-intro{color:var(--dsw-alias-label-secondary); padding:0 2px 10px}
+.dsh-htt-set-row{display:flex; align-items:flex-start; gap:16px; padding:10px 2px; border-top:1px solid var(--dsw-alias-border-l1)}
+.dsh-htt-set-text{display:flex; flex-direction:column; gap:1px; flex:1 1 auto; min-width:0}
+.dsh-htt-set-label{font-weight:500}
+.dsh-htt-set-hint{color:var(--dsw-alias-label-secondary); font-size:12px; line-height:17px}
+.dsh-htt-set-control{flex:0 0 auto; display:flex; align-items:center; gap:6px; padding-top:1px}
+.dsh-htt-set-number{
+  box-sizing:border-box; width:76px; height:28px; padding:0 8px;
+  border:1px solid var(--dsw-alias-border-l2); border-radius:var(--dsw-radius-sm);
+  background:var(--dsw-alias-bg-layer-1); color:inherit; font:inherit; text-align:right;
+}
+.dsh-htt-set-group{
+  display:flex; gap:2px; padding:2px;
+  border:1px solid var(--dsw-alias-border-l1); border-radius:var(--dsw-radius-sm);
+  background:var(--dsw-alias-bg-layer-1);
+}
+.dsh-htt-set-segment, .dsh-htt-set-toggle, .dsh-htt-set-reset{
+  box-sizing:border-box; height:24px; padding:0 10px;
+  border:1px solid transparent; border-radius:6px; background:transparent;
+  color:var(--dsw-alias-label-secondary); font:inherit; font-size:12px; line-height:22px; cursor:pointer;
+  transition:background-color var(--dsh-htt-t-press,140ms) linear, color var(--dsh-htt-t-press,140ms) linear;
+}
+.dsh-htt-set-segment:hover, .dsh-htt-set-toggle:hover, .dsh-htt-set-reset:hover{
+  background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary);
+}
+.dsh-htt-set-segment[data-on], .dsh-htt-set-toggle[data-on]{
+  background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary);
+  border-color:var(--dsw-alias-border-l2); font-weight:500;
+}
+.dsh-htt-set-reset{height:28px; line-height:26px}
+.dsh-htt-set-number:focus-visible, .dsh-htt-set-segment:focus-visible,
+.dsh-htt-set-toggle:focus-visible, .dsh-htt-set-reset:focus-visible{
+  outline-style:solid; outline-width:2px; outline-offset:2px;
+  outline-color:var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+}
+`;
+
+		/** One labelled row: what it is and why, on the left; the control on the right. */
+		function SettingsPage(props) {
+			const [values, setValues] = React.useState(() => config.all());
+			React.useEffect(() => config.subscribe(() => setValues(config.all())), []);
+			const t = (key) => translate(props, key);
+
+			const row = (key, label, hint, control) =>
+				h(
+					'div',
+					{ className: 'dsh-htt-set-row', key, 'data-setting': key },
+					h(
+						'div',
+						{ className: 'dsh-htt-set-text' },
+						h('span', { className: 'dsh-htt-set-label' }, label),
+						h('span', { className: 'dsh-htt-set-hint' }, hint),
+					),
+					h('div', { className: 'dsh-htt-set-control' }, control),
+				);
+
+			return h(
+				'div',
+				{ className: 'dsh-htt-set' },
+				h('style', null, SETTINGS_STYLES),
+				h('div', { className: 'dsh-htt-set-intro' }, t('settingsIntro')),
+				row(
+					'holdMs',
+					t('holdMsLabel'),
+					t('holdMsHint'),
+					h('input', {
+						type: 'number',
+						className: 'dsh-htt-set-number',
+						min: CONFIG_FIELDS.holdMs.min,
+						max: CONFIG_FIELDS.holdMs.max,
+						step: CONFIG_FIELDS.holdMs.step,
+						value: values.holdMs,
+						'aria-label': t('holdMsLabel'),
+						onChange: (event) => config.set('holdMs', event.target.value),
+					}),
+				),
+				row(
+					'motion',
+					t('motionLabel'),
+					t('motionHint'),
+					h(
+						'div',
+						{ className: 'dsh-htt-set-group', role: 'radiogroup', 'aria-label': t('motionLabel') },
+						CONFIG_FIELDS.motion.oneOf.map((option) =>
+							h(
+								'button',
+								{
+									type: 'button',
+									key: option,
+									className: 'dsh-htt-set-segment',
+									role: 'radio',
+									'aria-checked': values.motion === option ? 'true' : 'false',
+									'data-on': values.motion === option ? '' : undefined,
+									onClick: () => config.set('motion', option),
+								},
+								t(option === 'full' ? 'motionFull' : 'motionCalm'),
+							),
+						),
+					),
+				),
+				row(
+					'hint',
+					t('hintLabel'),
+					t('hintHint'),
+					h(
+						'button',
+						{
+							type: 'button',
+							className: 'dsh-htt-set-toggle',
+							'aria-pressed': values.hint ? 'true' : 'false',
+							'data-on': values.hint ? '' : undefined,
+							onClick: () => config.set('hint', !values.hint),
+						},
+						t(values.hint ? 'switchOn' : 'switchOff'),
+					),
+				),
+				row(
+					'chord',
+					t('chordLabel'),
+					t('chordHint'),
+					h(
+						'div',
+						{ className: 'dsh-htt-set-group', role: 'radiogroup', 'aria-label': t('chordLabel') },
+						CONFIG_FIELDS.chord.oneOf.map((option) =>
+							h(
+								'button',
+								{
+									type: 'button',
+									key: option,
+									className: 'dsh-htt-set-segment',
+									role: 'radio',
+									'aria-checked': values.chord === option ? 'true' : 'false',
+									'data-on': values.chord === option ? '' : undefined,
+									onClick: () => config.set('chord', option),
+								},
+								option === 'off' ? t('chordOff') : CHORDS[option].label,
+							),
+						),
+					),
+				),
+				h(
+					'div',
+					{ className: 'dsh-htt-set-row' },
+					h('div', { className: 'dsh-htt-set-text' }, h('span', { className: 'dsh-htt-set-hint' }, t('settingsLocal'))),
+					h(
+						'div',
+						{ className: 'dsh-htt-set-control' },
+						h(
+							'button',
+							{ type: 'button', className: 'dsh-htt-set-reset', onClick: () => config.reset() },
+							t('settingsReset'),
+						),
+					),
+				),
+			);
+		}
+
+		//#endregion
+
 		//#region component
 
 		/** Prefer the entry's injected `transcribe`; fall back to the Remote captured at activation. */
@@ -769,18 +1158,12 @@ window.__ModuleLoader__.load({
 		const BUSY_PHASES = new Set(['recording', 'transcribing']);
 		/** Below this much room in the tool row the hint is dropped rather than overlapped. */
 		const HINT_MIN_PX = 48;
-		/**
-		 * The keyboard equivalent of the hold.
-		 *
-		 * The mouse needs a 300 ms threshold to tell a hold from a click; a three-key chord has
-		 * no such ambiguity, so it starts on the keydown and ends on the keyup — the model is
-		 * identical to hold-and-release, which is the whole point. A global chord is a real
-		 * hijack, so it is deliberately awkward to hit by accident and it never preventDefaults
-		 * anything unless it actually starts a recording.
+		/*
+		 * The keyboard equivalent of the hold lives in the config region, because which chord it
+		 * is has to be read from settings on every keystroke: the mouse needs a threshold to tell
+		 * a hold from a click, but a three-key chord has no such ambiguity, so it starts on the
+		 * keydown and ends on the keyup — hold-and-release, exactly like the pointer.
 		 */
-		const isChord = (event) => event.ctrlKey && event.shiftKey && (event.code === 'Space' || event.key === ' ');
-		const isChordKey = (event) => event.key === 'Control' || event.key === 'Shift'
-			|| event.code === 'Space' || event.key === ' ';
 
 		function HoldToTalk(props) {
 			const root = React.useRef(null);
@@ -790,6 +1173,13 @@ window.__ModuleLoader__.load({
 			const [box, setBox] = React.useState({ height: 0, rowHeight: 0, hintRight: 14, hintMax: 0 });
 			const latest = React.useRef(null);
 			latest.current = { props, view, setHovered, setView };
+			/*
+			 * Settings are read through `config` at the moment they are needed, but the layer has
+			 * to re-render when one changes: the motion preference and the ring's hold duration
+			 * are CSS hooks, not values the effect can apply imperatively.
+			 */
+			const [settings, setSettings] = React.useState(() => config.all());
+			React.useEffect(() => config.subscribe(() => setSettings(config.all())), []);
 			// Notices live and die on timers owned by the setup effect below, so that the exit
 			// animation can run before the element unmounts. A React effect cannot do this:
 			// its dependency on `view` would restart the countdown the moment it re-renders.
@@ -1394,7 +1784,8 @@ window.__ModuleLoader__.load({
 					state.samples = [{ t: event.timeStamp, y: event.clientY }];
 					/*
 					 * Acknowledge the press on the frame it happens. The ring starts drawing at
-					 * the point of contact over HOLD_MS, so those 300 ms stop being a dead zone
+					 * the point of contact over the configured hold, so those milliseconds stop
+					 * being a dead zone
 					 * — but it is deliberately faint, because the same gesture also begins a
 					 * caret move or a text selection and must not disturb either.
 					 */
@@ -1408,7 +1799,7 @@ window.__ModuleLoader__.load({
 					state.timer = window.setTimeout(() => {
 						state.timer = 0;
 						void begin();
-					}, HOLD_MS);
+					}, config.get('holdMs'));
 					window.addEventListener('pointermove', onMove, true);
 					window.addEventListener('pointerup', onUp, true);
 					window.addEventListener('pointercancel', onCancel, true);
@@ -1587,7 +1978,8 @@ window.__ModuleLoader__.load({
 			const busy = recording || view.phase === 'transcribing';
 			const cancelled = recording && view.cancelled;
 			// The hint is shown only when the tool row genuinely has room for it.
-			const showHint = hovered && view.phase === 'idle' && pending === '' && box.hintMax >= HINT_MIN_PX;
+			const showHint = hovered && view.phase === 'idle' && pending === ''
+				&& config.get('hint') && box.hintMax >= HINT_MIN_PX;
 			const showPending = !busy && (pending !== '' || view.pendingLeaving);
 			const showBubble = busy || view.bubbleLeaving;
 
@@ -1616,7 +2008,12 @@ window.__ModuleLoader__.load({
 
 			return h(
 				'div',
-				{ ref: root, className: 'dsh-htt-layer', style: layerStyle(box.height) },
+				{
+					ref: root,
+					className: 'dsh-htt-layer',
+					'data-motion': settings.motion,
+					style: { ...layerStyle(box.height), '--dsh-htt-hold': `${settings.holdMs}ms` },
+				},
 				h('style', null, STYLES),
 				view.arm !== null &&
 					h(
@@ -1802,6 +2199,21 @@ window.__ModuleLoader__.load({
 
 		function apply(ctx) {
 			ctx.effect(() => ctx.locale.register(NS, { zh, en }));
+			/*
+			 * The bundle's own page in Settings → Plugins. The manager keys it by package name —
+			 * that is what it passes down as `entryKey` — and shows it between the bundle's
+			 * description and its rows.
+			 *
+			 * Deliberately *outside* the `remote.speech` injection below: settings have to be
+			 * reachable while the official voice-input bundle is switched off, which is exactly
+			 * when someone would go looking for them.
+			 */
+			ctx.inject(['slots'], (scope) => {
+				scope.effect(() => scope.slots.inject(CONFIG_SLOT, () => scope.slots.register(
+					{ name: CONFIG_SLOT, key: PKG, locale: NS },
+					SettingsPage,
+				)));
+			});
 			// `remote.speech` is mounted by the experimental voice-input plugin; if that
 			// bundle is off the namespace is absent and this callback never runs, so the
 			// composer simply keeps its normal behaviour.
