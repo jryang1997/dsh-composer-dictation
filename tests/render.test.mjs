@@ -28,9 +28,37 @@ const check = (condition, label) => {
 	if (!condition) failures.push(label);
 };
 
+//#region an event registry, so the keyboard path can actually be exercised
+
+/** Every listener the component attaches, keyed by event type. */
+const listeners = new Map();
+const listen = (type, fn) => {
+	const bound = listeners.get(type) ?? [];
+	bound.push(fn);
+	listeners.set(type, bound);
+};
+const unlisten = (type, fn) => {
+	listeners.set(type, (listeners.get(type) ?? []).filter((bound) => bound !== fn));
+};
+const fire = (type, event) => {
+	let handled = 0;
+	for (const fn of listeners.get(type) ?? []) {
+		fn(event);
+		handled += 1;
+	}
+	return handled;
+};
+
+//#endregion
+
 //#region the module loader handshake
 
 let loaded = null;
+const fakeDocument = {
+	hidden: false,
+	addEventListener: listen,
+	removeEventListener: unlisten,
+};
 const fakeWindow = {
 	__ModuleLoader__: { load: (module) => { loaded = module; } },
 	btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
@@ -38,11 +66,12 @@ const fakeWindow = {
 	clearTimeout: () => undefined,
 	requestAnimationFrame: () => 0,
 	cancelAnimationFrame: () => undefined,
-	addEventListener: () => undefined,
-	removeEventListener: () => undefined,
+	addEventListener: listen,
+	removeEventListener: unlisten,
 };
-new Function('window', 'navigator', 'AudioContext', 'OfflineAudioContext', source)(
+new Function('window', 'document', 'navigator', 'AudioContext', 'OfflineAudioContext', source)(
 	fakeWindow,
+	fakeDocument,
 	{ language: 'zh-CN' },
 	function AudioContext() {},
 	function OfflineAudioContext() {},
@@ -53,21 +82,53 @@ check(loaded?.id === '@jryang1997/dsh-composer-dictation', 'bundle id still matc
 
 //#endregion
 
-//#region a React just real enough to render once
+//#region a DOM and a React just real enough to mount once
 
 const flatten = (nodes) => nodes.flatMap((node) => (Array.isArray(node) ? flatten(node) : [node]));
+
+const rect = (left, top, width, height) => ({
+	left, top, width, height, right: left + width, bottom: top + height,
+	getBoundingClientRect() { return this; },
+});
+
+/** The card, its tool row, and two children so `measure()` finds a trailing group. */
+const fakeCard = () => {
+	const node = {
+		...rect(0, 100, 600, 84),
+		style: { setProperty: () => undefined },
+		addEventListener: listen,
+		removeEventListener: unlisten,
+		contains: () => true,
+		querySelectorAll: () => [],
+	};
+	node.lastElementChild = {
+		...rect(0, 142, 600, 42),
+		children: [
+			{ ...rect(8, 148, 120, 30) },      // the leading controls
+			{ ...rect(380, 148, 212, 34) },    // the trailing group
+		],
+	};
+	node.closest = () => node;
+	return node;
+};
+
 let preset = [];
 let hookIndex = 0;
+let refQueue = [];
+let cleanups = [];
 const React = {
 	createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
-	useRef: (value) => ({ current: value }),
+	// The refs the component asks for are (root, wave); both need to look mounted.
+	useRef: (value) => (refQueue.length > 0 ? refQueue.shift() : { current: value }),
 	useState: (value) => {
 		const given = preset[hookIndex];
 		hookIndex += 1;
 		return [given === undefined ? value : given, () => undefined];
 	},
-	// Effects need a real DOM; the render path is what this test covers.
-	useEffect: () => undefined,
+	useEffect: (fn) => {
+		const cleanup = fn();
+		if (typeof cleanup === 'function') cleanups.push(cleanup);
+	},
 };
 
 //#endregion
@@ -171,15 +232,39 @@ const rule = (css, selector) => {
 
 const IDLE = {
 	phase: 'idle', notice: '', tone: 'info', leaving: false, cancelled: false, pending: '',
-	pendingLeaving: false, bubbleLeaving: false, arm: null, armLeaving: false,
+	pendingLeaving: false, bubbleLeaving: false, arm: null, armLeaving: false, retryable: false,
 };
 const BOX = { height: 84, rowHeight: 42, hintRight: 220, hintMax: 180 };
 
-const render = (hovered, view, box = BOX) => {
+/** What the component calls when it wants to write to the draft. */
+const inputActions = {
+	inserted: [],
+	captured: 0,
+	captureInsertion() { this.captured += 1; return { start: 0, end: 0, draftRev: 1 }; },
+	insertText(text) { this.inserted.push(text); return true; },
+};
+
+/**
+ * Mount the component once, with a fresh DOM and listener registry, and leave the effect
+ * attached so the keyboard path can be driven afterwards.
+ */
+const render = (hovered, view, box = BOX, props = {}) => {
+	for (const cleanup of cleanups) cleanup();
+	cleanups = [];
+	listeners.clear();
 	preset = [hovered, view, box];
 	hookIndex = 0;
-	return component({ t: undefined });
+	refQueue = [{ current: fakeCard() }, { current: { querySelectorAll: () => [] } }];
+	return component({ t: undefined, inputActions, ...props });
 };
+
+/** A keyboard event carrying only what the plugin reads. */
+const key = (over) => ({
+	key: ' ', code: 'Space', ctrlKey: true, shiftKey: true, repeat: false,
+	preventDefault() { this.prevented = true; },
+	stopPropagation() { this.stopped = true; },
+	...over,
+});
 
 // Idle, hovered: the hint exists and is parked in the tool row.
 let tree = render(true, IDLE);
@@ -263,6 +348,59 @@ check(attrs(tree, 'aria-hidden').length > 0, 'the decorative layers stay aria-hi
 tree = render(false, { ...IDLE, arm: { x: 120, y: 30 }, armLeaving: true });
 check(attrs(tree, 'data-leaving').length === 1, 'the retracting ring carries data-leaving');
 
+// A failure stays on screen and offers a way out, unlike a notice.
+tree = render(false, { ...IDLE, phase: 'failed', notice: '转写失败：boom', tone: 'error', retryable: true });
+names = classes(tree);
+check(names.includes('dsh-htt-failure'), 'the failure card renders');
+check(attrs(tree, 'role').includes('alert'), 'the failure announces itself assertively');
+check(classes(tree).filter((name) => name.includes('dsh-htt-action')).length === 2,
+	'a retryable failure offers both retry and dismiss');
+check(!names.includes('dsh-htt-notice'), 'a failure is not shown as a notice');
+
+// Not everything can be retried: a recording that was too long would fail again.
+tree = render(false, { ...IDLE, phase: 'failed', notice: '太长了', tone: 'error', retryable: false });
+check(classes(tree).filter((name) => name.includes('dsh-htt-action')).length === 1,
+	'a non-retryable failure offers only dismiss');
+
+// The transient notice keeps the polite role, because nothing is being asked of the user.
+tree = render(false, { ...IDLE, phase: 'notice', notice: '已取消', tone: 'muted' });
+check(attrs(tree, 'role').includes('status'), 'the notice keeps the polite role');
+
+//#endregion
+
+//#region keyboard entry — the chord is the hold, the release is the release
+
+inputActions.captured = 0;
+render(true, IDLE);
+check(fire('keydown', key()) === 1, 'the chord is listened for');
+check(inputActions.captured === 1, 'the chord starts a capture with no pointer involved');
+
+const held = key({ repeat: true });
+fire('keydown', held);
+check(held.prevented === true, 'a repeated chord keydown is swallowed rather than restarting');
+
+const partial = key({ shiftKey: false });
+fire('keydown', partial);
+check(partial.prevented === undefined, 'space without the full chord is left alone');
+
+const release = key({ key: 'Control', code: 'ControlLeft' });
+fire('keyup', release);
+check(release.prevented === true, 'releasing the chord is claimed, which is what ends the recording');
+
+const stray = key({ key: 'Control', code: 'ControlLeft' });
+fire('keyup', stray);
+check(stray.prevented === undefined, 'a keyup outside a chord is left alone');
+
+const untouched = key({ key: 'a', code: 'KeyA', ctrlKey: false, shiftKey: false });
+fire('keydown', untouched);
+check(untouched.prevented === undefined, 'unrelated keys are never interfered with');
+
+// The pointer path is still pointer-only: a click that goes nowhere must not record.
+inputActions.captured = 0;
+render(true, IDLE);
+fire('keydown', untouched);
+check(inputActions.captured === 0, 'a non-chord key never starts a recording');
+
 //#endregion
 
 //#region the injected stylesheet
@@ -295,6 +433,10 @@ check(rule(css, '.dsh-htt-edge').includes('pointer-events:none'),
 	"the card's discard hairline never takes pointer events");
 check(rule(css, '.dsh-htt-pending[data-leaving]').includes('pointer-events:none'),
 	'the exiting chip does not accept a second click');
+check(rule(css, '.dsh-htt-failure').includes('pointer-events:auto'),
+	'the failure card accepts the clicks its own buttons need');
+check(rule(css, '.dsh-htt-action:focus-visible').includes('outline-style:solid'),
+	'the failure actions take keyboard focus visibly');
 check(/\.dsh-htt-ring\{[^}]*transition-delay:110ms/.test(css),
 	'the press ring waits before appearing, so caret clicks do not flash it');
 
