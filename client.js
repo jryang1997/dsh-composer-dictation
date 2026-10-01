@@ -82,9 +82,12 @@ window.__ModuleLoader__.load({
 			transcribing: '识别中',
 			cancelled: '已取消',
 			empty: '没有识别到内容，可以说长一点再试',
+			tooShort: '太短了，按住再多说一会儿',
 			conflict: '草稿已改动，转写结果保留在右下角',
 			pending: '插入转写',
 			pendingHint: '点击插入到当前光标',
+			retry: '重试',
+			dismiss: '关闭',
 			notReady: '语音模型还没准备好：请到「设置 → 插件 → 语音输入」点一次「下载并准备」',
 			failed: '转写失败：{message}',
 			unavailable: '当前环境无法录音',
@@ -100,9 +103,12 @@ window.__ModuleLoader__.load({
 			transcribing: 'Transcribing',
 			cancelled: 'Cancelled',
 			empty: 'Nothing was recognized — try speaking a little longer',
+			tooShort: 'Too short — hold a little longer',
 			conflict: 'Draft changed; the transcript is kept at the lower right',
 			pending: 'Insert transcript',
 			pendingHint: 'Click to insert at the current caret',
+			retry: 'Retry',
+			dismiss: 'Dismiss',
 			notReady: 'The speech models are not prepared yet: open Settings → Plugins → Voice input and run "Download and prepare" once',
 			failed: 'Could not transcribe the recording: {message}',
 			unavailable: 'This environment cannot record audio',
@@ -550,6 +556,51 @@ window.__ModuleLoader__.load({
   transition-timing-function:var(--dsh-htt-in-out);
 }
 
+/* ---- a failure waits for an answer ------------------------------------ */
+/*
+ * The notice flashes past because nothing is being asked of you. A failure is the opposite:
+ * it stays until it is dismissed or retried, so it carries controls, stays legible if the
+ * message is long, and announces itself assertively rather than politely.
+ */
+.dsh-htt-failure{
+  position:absolute; display:flex; align-items:flex-start; gap:8px;
+  box-sizing:border-box; padding:7px 9px;
+  border-radius:var(--dsw-radius-sm);
+  background:var(--dsw-alias-bg-layer-2);
+  --dsw-elevation-stroke-color:var(--dsw-alias-state-error-primary);
+  box-shadow:var(--dsw-elevation-stroke);
+  color:var(--dsw-alias-state-error-primary);
+  font-size:13px; line-height:18px;
+  pointer-events:auto;
+  transition:opacity var(--dsh-htt-t-base) var(--dsh-htt-out),
+             translate var(--dsh-htt-t-base) var(--dsh-htt-out);
+}
+@starting-style{.dsh-htt-failure{opacity:0; translate:0 5px}}
+.dsh-htt-failure[data-leaving]{
+  opacity:0; translate:0 3px;
+  transition-duration:var(--dsh-htt-t-exit);
+  transition-timing-function:var(--dsh-htt-in-out);
+}
+.dsh-htt-failure-text{
+  flex:1 1 auto; min-width:0; display:-webkit-box;
+  -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.dsh-htt-action{
+  flex:0 0 auto; box-sizing:border-box; height:22px; padding:0 8px;
+  border:1px solid currentColor; border-radius:6px; background:transparent;
+  color:inherit; font:inherit; font-size:12px; line-height:20px; cursor:pointer;
+  transition:background-color var(--dsh-htt-t-press) var(--dsh-htt-out),
+             scale var(--dsh-htt-t-press) var(--dsh-htt-out);
+}
+.dsh-htt-action:hover{background:color-mix(in srgb, currentColor 12%, transparent)}
+.dsh-htt-action:active{scale:.96}
+.dsh-htt-action:focus-visible{
+  /* The host's own ring, so its pointer-modality suppression still wins. */
+  outline-style:solid; outline-width:2px; outline-offset:2px;
+  outline-color:var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+}
+.dsh-htt-action-icon{width:22px; padding:0; display:grid; place-items:center}
+
 @media (prefers-reduced-motion:reduce){
   /* Gentler, not none: opacity and colour stay, movement goes. */
   .dsh-htt-hint,.dsh-htt-pending,.dsh-htt-notice,.dsh-htt-row > *{
@@ -712,12 +763,24 @@ window.__ModuleLoader__.load({
 
 		const IDLE = {
 			phase: 'idle', notice: '', tone: 'info', leaving: false, cancelled: false, pending: '',
-			pendingLeaving: false, bubbleLeaving: false, arm: null, armLeaving: false,
+			pendingLeaving: false, bubbleLeaving: false, arm: null, armLeaving: false, retryable: false,
 		};
 		/** The phases that put the recording bubble on screen. */
 		const BUSY_PHASES = new Set(['recording', 'transcribing']);
 		/** Below this much room in the tool row the hint is dropped rather than overlapped. */
 		const HINT_MIN_PX = 48;
+		/**
+		 * The keyboard equivalent of the hold.
+		 *
+		 * The mouse needs a 300 ms threshold to tell a hold from a click; a three-key chord has
+		 * no such ambiguity, so it starts on the keydown and ends on the keyup — the model is
+		 * identical to hold-and-release, which is the whole point. A global chord is a real
+		 * hijack, so it is deliberately awkward to hit by accident and it never preventDefaults
+		 * anything unless it actually starts a recording.
+		 */
+		const isChord = (event) => event.ctrlKey && event.shiftKey && (event.code === 'Space' || event.key === ' ');
+		const isChordKey = (event) => event.key === 'Control' || event.key === 'Shift'
+			|| event.code === 'Space' || event.key === ' ';
 
 		function HoldToTalk(props) {
 			const root = React.useRef(null);
@@ -806,6 +869,8 @@ window.__ModuleLoader__.load({
 					active: false,
 					busy: false,
 					cancelled: false,
+					keyboard: false,
+					retry: null,
 					level: 0,
 					capture: null,
 					starting: null,
@@ -922,6 +987,42 @@ window.__ModuleLoader__.load({
 					return say('failed', { message });
 				};
 
+				/**
+				 * Park a failure on screen instead of flashing it for 2.8 s.
+				 *
+				 * A notice is for something that has already resolved itself. A failure is
+				 * something the user may want to act on, so it stays until it is dismissed or
+				 * retried. `retry` carries what trying again needs — currently the encoded audio,
+				 * when the failure happened after it was already captured.
+				 */
+				const fail = (message, retry) => {
+					state.retry = retry ?? null;
+					show({
+						phase: 'failed',
+						notice: message,
+						tone: 'error',
+						retryable: retry !== undefined && retry !== null,
+						cancelled: false,
+					});
+				};
+
+				const dismissFailure = () => {
+					state.retry = null;
+					show({ phase: 'idle', notice: '', cancelled: false });
+				};
+
+				/**
+				 * Try the retained recording again. The Host hiccuped; the user should not have
+				 * to say the same sentence twice.
+				 */
+				const retryFailure = () => {
+					const pending = state.retry;
+					if (pending === null || state.busy) return;
+					state.retry = null;
+					state.busy = true;
+					void transmit(pending.audio, pending.span, state.run);
+				};
+
 				const clearTimer = () => {
 					if (state.timer !== 0) {
 						window.clearTimeout(state.timer);
@@ -1022,6 +1123,8 @@ window.__ModuleLoader__.load({
 					state.starting = null;
 					state.active = false;
 					state.busy = false;
+					state.keyboard = false;
+					state.retry = null;
 					state.span = null;
 					state.run += 1;
 					resetGesture();
@@ -1101,6 +1204,9 @@ window.__ModuleLoader__.load({
 				async function begin() {
 					const actions = latest.current.props.inputActions;
 					if (actions === undefined || actions === null) return;
+					// Two entry points can race for this — a hold that just crossed its threshold
+					// and a chord — and one capture per gesture is the whole contract.
+					if (state.active || state.busy) return;
 					const run = ++state.run;
 					// A hold that starts while a previous transcription is still in flight
 					// abandons that request: the run check discards its result anyway, and
@@ -1108,6 +1214,9 @@ window.__ModuleLoader__.load({
 					if (state.abort !== null) state.abort.abort();
 					state.active = true;
 					state.busy = true;
+					// A new recording supersedes any failure still on screen, and whatever it
+					// was offering to retry.
+					state.retry = null;
 					state.span = actions.captureInsertion();
 					state.abort = new AbortController();
 					resetGesture();
@@ -1143,7 +1252,7 @@ window.__ModuleLoader__.load({
 						state.starting = null;
 						state.active = false;
 						state.busy = false;
-						show({ phase: 'notice', notice: failure(error), tone: 'error' });
+						fail(failure(error), null);
 					}
 				}
 
@@ -1154,6 +1263,7 @@ window.__ModuleLoader__.load({
 					const starting = state.starting;
 					const run = state.run;
 					state.active = false;
+					state.keyboard = false;
 					state.capture = null;
 					state.starting = null;
 					state.span = null;
@@ -1175,22 +1285,50 @@ window.__ModuleLoader__.load({
 						const audio = await capture.stop();
 						if (run !== state.run) return;
 						if (audio.seconds < MIN_SECONDS) {
+							// Saying nothing is the one outcome that used to be silent, and a
+							// keyboard chord makes it easy to hit by accident.
 							state.busy = false;
-							show({ phase: 'idle', notice: '', cancelled: false });
+							show({ phase: 'notice', notice: say('tooShort'), tone: 'muted', cancelled: false });
 							return;
 						}
 						const limitBytes = Math.min(MAX_BYTES, runtime.limits?.maxAudioBytes ?? MAX_BYTES);
 						if (audio.buffer.byteLength > limitBytes) {
 							state.busy = false;
-							show({ phase: 'notice', notice: say('tooLarge'), tone: 'error', cancelled: false });
+							fail(say('tooLarge'), null);
 							return;
 						}
-						const transcribe = resolveTranscribe(latest.current.props);
-						if (typeof transcribe !== 'function') {
-							state.busy = false;
-							show({ phase: 'notice', notice: say('unavailable'), tone: 'error', cancelled: false });
-							return;
-						}
+						await transmit(audio, span, run);
+					} catch (error) {
+						// A stale run's failure must stay invisible: the current run owns `busy`,
+						// and clearing it here would break Esc for that run.
+						if (run !== state.run) return;
+						state.busy = false;
+						fail(failure(error), null);
+					} finally {
+						capture.dispose();
+					}
+				}
+
+				/**
+				 * Send one encoded recording to the Host and place what comes back.
+				 *
+				 * Split out of `finish()` because it is also the whole of Retry: when the Host
+				 * hiccups after the audio is already captured, re-sending it is far better than
+				 * asking the user to say the same thing again. The audio is handed back on
+				 * failure so the failure card can offer exactly that.
+				 */
+				async function transmit(audio, span, run) {
+					const transcribe = resolveTranscribe(latest.current.props);
+					if (typeof transcribe !== 'function') {
+						state.busy = false;
+						fail(say('unavailable'), null);
+						return;
+					}
+					show({ phase: 'transcribing', notice: '', cancelled: false });
+					if (state.abort !== null) state.abort.abort();
+					const abort = new AbortController();
+					state.abort = abort;
+					try {
 						// No providerId/language: the Host resolves both from its own
 						// configuration (this profile selects sensevoice-local, language auto),
 						// so the request can never fail a provider language whitelist.
@@ -1198,29 +1336,28 @@ window.__ModuleLoader__.load({
 						if (run !== state.run) return;
 						state.busy = false;
 						if (result === undefined || result.ok !== true) {
-							show({ phase: 'notice', notice: failureNotice(result?.error?.message ?? ''), tone: 'error' });
+							fail(failureNotice(result?.error?.message ?? ''), { audio, span });
 							return;
 						}
 						const transcript = result.value?.text ?? '';
 						if (transcript === '') {
-							show({ phase: 'notice', notice: say('empty'), tone: 'info' });
+							state.retry = null;
+							show({ phase: 'notice', notice: say('empty'), tone: 'info', cancelled: false });
 							return;
 						}
 						const actions = latest.current.props.inputActions;
 						if (actions === undefined || actions.insertText(transcript, span) !== true) {
 							// Keep the text: the draft moved on, so the user decides when to insert it.
+							state.retry = null;
 							show({ phase: 'idle', notice: '', pending: transcript });
 							return;
 						}
+						state.retry = null;
 						show({ phase: 'idle', notice: '', cancelled: false });
 					} catch (error) {
-						// A stale run's failure must stay invisible: the current run owns `busy`,
-						// and clearing it here would break Esc for that run.
 						if (run !== state.run) return;
 						state.busy = false;
-						show({ phase: 'notice', notice: failure(error), tone: 'error', cancelled: false });
-					} finally {
-						capture.dispose();
+						fail(failure(error), { audio, span });
 					}
 				}
 
@@ -1348,11 +1485,51 @@ window.__ModuleLoader__.load({
 				};
 
 				const onKeyDown = (event) => {
-					if (event.key !== 'Escape') return;
-					if (!state.busy && state.timer === 0) return;
+					if (event.key === 'Escape') {
+						if (state.busy || state.timer !== 0) {
+							event.preventDefault();
+							event.stopPropagation();
+							cancel(false);
+							return;
+						}
+						// A failure waits for an answer, so Escape has to be one of them.
+						if (latest.current.view.phase === 'failed') {
+							event.preventDefault();
+							event.stopPropagation();
+							dismissFailure();
+						}
+						return;
+					}
+					if (!isChord(event)) return;
+					// Swallow every repeat so holding the chord does not restart anything, but
+					// never preventDefault unless this is genuinely the start of a recording.
+					if (event.repeat) {
+						event.preventDefault();
+						return;
+					}
+					if (state.busy || state.active || state.timer !== 0) return;
+					if (latest.current.props.inputActions === undefined) return;
 					event.preventDefault();
 					event.stopPropagation();
-					cancel(false);
+					state.keyboard = true;
+					dropRing();
+					void begin();
+				};
+
+				/**
+				 * The chord ends when any of its three keys comes up, which is what makes
+				 * "release to transcribe" and "release to discard" behave exactly as they do
+				 * under the mouse.
+				 */
+				const onKeyUp = (event) => {
+					if (!state.keyboard) return;
+					if (!isChordKey(event)) return;
+					event.preventDefault();
+					state.keyboard = false;
+					if (state.active) {
+						if (state.cancelled) cancel(false);
+						else void finish();
+					}
 				};
 
 				const onVisibility = () => {
@@ -1368,6 +1545,7 @@ window.__ModuleLoader__.load({
 				card.addEventListener('pointerenter', onEnter);
 				card.addEventListener('pointerleave', onLeave);
 				document.addEventListener('keydown', onKeyDown, true);
+				document.addEventListener('keyup', onKeyUp, true);
 				document.addEventListener('visibilitychange', onVisibility);
 				window.addEventListener('blur', onBlur);
 
@@ -1376,6 +1554,7 @@ window.__ModuleLoader__.load({
 					card.removeEventListener('pointerenter', onEnter);
 					card.removeEventListener('pointerleave', onLeave);
 					document.removeEventListener('keydown', onKeyDown, true);
+					document.removeEventListener('keyup', onKeyUp, true);
 					document.removeEventListener('visibilitychange', onVisibility);
 					window.removeEventListener('blur', onBlur);
 					window.removeEventListener('resize', measure);
@@ -1393,6 +1572,8 @@ window.__ModuleLoader__.load({
 						state.raf = 0;
 					}
 					detach();
+					state.keyboard = false;
+					state.retry = null;
 					state.run += 1;
 					if (state.abort !== null) state.abort.abort();
 					if (state.capture !== null) state.capture.dispose();
@@ -1574,6 +1755,43 @@ window.__ModuleLoader__.load({
 						},
 						h(NoticeGlyph, { tone: view.tone }),
 						h('span', null, view.notice),
+					),
+				view.phase === 'failed' &&
+					h(
+						'div',
+						{
+							className: 'dsh-htt-failure',
+							style: noticeStyle(box),
+							// assertive, not polite: this one is waiting for the user.
+							role: 'alert',
+						},
+						h(NoticeGlyph, { tone: 'error' }),
+						h('span', { className: 'dsh-htt-failure-text', title: view.notice }, view.notice),
+						view.retryable &&
+							h(
+								'button',
+								{
+									type: 'button',
+									className: 'dsh-htt-action',
+									onPointerDown: (event) => event.stopPropagation(),
+									onMouseDown: (event) => event.preventDefault(),
+									onClick: () => retryFailure(),
+								},
+								translate(props, 'retry'),
+							),
+						h(
+							'button',
+							{
+								type: 'button',
+								className: 'dsh-htt-action dsh-htt-action-icon',
+								'aria-label': translate(props, 'dismiss'),
+								title: translate(props, 'dismiss'),
+								onPointerDown: (event) => event.stopPropagation(),
+								onMouseDown: (event) => event.preventDefault(),
+								onClick: () => dismissFailure(),
+							},
+							h(DiscardGlyph, { size: 11 }),
+						),
 					),
 			);
 		}
