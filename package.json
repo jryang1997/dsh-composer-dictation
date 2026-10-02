@@ -38,10 +38,11 @@
     "client.js",
     "cordis.patch.yml",
     "icon.svg",
-    "docs/logo.png",
-    "docs/gesture-overview.svg",
     "locale/*.json",
     "docs/*.md",
+    "docs/dictation-demo.gif",
+    "docs/settings-user.png",
+    "docs/settings-user-2.png",
     "README.md",
     "README.en.md",
     "CHANGELOG.md",
@@ -49,8 +50,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node tests/locales.test.mjs && node tests/render.test.mjs && node tests/live.test.mjs",
-    "check": "node --check index.js && node --check client.js && node tests/locales.test.mjs && node tests/render.test.mjs && node tests/live.test.mjs"
+    "test": "node tests/locales.test.mjs && node tests/render.test.mjs && node tests/live.test.mjs && node tests/package.test.mjs",
+    "check": "node --check index.js && node --check client.js && npm test"
   },
   "dsh": {
     "bundle": {

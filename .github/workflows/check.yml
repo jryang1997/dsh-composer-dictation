@@ -26,3 +26,5 @@ jobs:
         run: node tests/render.test.mjs
       - name: Check live dictation and safe cancellation
         run: node tests/live.test.mjs
+      - name: Check the published tarball
+        run: node tests/package.test.mjs

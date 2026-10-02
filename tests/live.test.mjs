@@ -7,7 +7,7 @@ const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve()
 globalThis.Element = class {};
 globalThis.Node = class {};
 
-function mount({ selected = false, live = true, location = 'host-local', workletAvailable = true, occurrences = [] } = {}) {
+function mount({ selected = false, live = true, location = 'host-local', workletAvailable = true, occurrences = [], stored } = {}) {
 	let component, worklet, tree, now = 0, cursor = 0, mounted = false;
 	let draft = selected ? '前旧后' : '前后', rev = 0;
 	const hooks = [], effects = [], listeners = new Map(), timers = new Map(), calls = [];
@@ -75,7 +75,7 @@ function mount({ selected = false, live = true, location = 'host-local', worklet
 				slots: { inject: (_slot, fn) => fn(), register(meta, fn) { if (meta.name === 'conversation.input.overlay') component = fn; } },
 			}),
 		}); } },
-		localStorage: { getItem: () => JSON.stringify({ live }), setItem() {}, removeItem() {} },
+		localStorage: { getItem: () => (stored === undefined ? JSON.stringify({ live }) : stored), setItem() {}, removeItem() {} },
 		btoa: value => Buffer.from(value, 'binary').toString('base64'),
 		setTimeout(fn, ms) { const id = Symbol(); timers.set(id, { fn, at: now + ms }); return id; },
 		clearTimeout: id => timers.delete(id), requestAnimationFrame: () => 0, cancelAnimationFrame() {},
@@ -207,6 +207,16 @@ await previewFailure.start(); await previewFailure.samples(); await previewFailu
 await previewFailure.finish(); await previewFailure.result(1, '完整识别');
 assert.equal(previewFailure.draft, '前后完整识别', 'preview errors still allow whole-recording recognition');
 previewFailure.dispose();
+
+// Every case above stores a config, so none of them ever runs the load() fallback. A fresh
+// install stores nothing at all, and that is exactly the install the README's "off by default"
+// describes — so the promise gets checked on the path that only a new user takes.
+const fresh = mount({ stored: null });
+await fresh.start(); await fresh.samples(); await fresh.advance();
+assert.equal(fresh.calls.length, 0, 'a fresh install keeps live dictation off, as the README promises');
+await fresh.finish(); await fresh.result(0, '松开识别');
+assert.equal(fresh.draft, '前后松开识别', 'a fresh install still transcribes on release');
+fresh.dispose();
 
 for (const options of [{ live: false }, { location: 'cloud' }, { workletAvailable: false }, { occurrences: [{}] }]) {
 	const fallback = mount(options);

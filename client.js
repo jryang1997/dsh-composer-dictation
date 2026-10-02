@@ -1517,6 +1517,7 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 					busy: false,
 					cancelled: false,
 					keyboard: false,
+					pointerId: null,
 					touch: false,
 					tolerance: ARM_TOLERANCE_PX,
 					retry: null,
@@ -1703,6 +1704,7 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 					window.removeEventListener('pointermove', onMove, true);
 					window.removeEventListener('pointerup', onUp, true);
 					window.removeEventListener('pointercancel', onCancel, true);
+					state.pointerId = null;
 					state.touch = false;
 					state.tolerance = ARM_TOLERANCE_PX;
 				};
@@ -1889,10 +1891,20 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 
 				async function begin() {
 					const actions = latest.current.props.inputActions;
-					if (actions === undefined || actions === null) return;
 					// Two entry points can race for this — a hold that just crossed its threshold
 					// and a chord — and one capture per gesture is the whole contract.
-					if (state.active || state.busy) return;
+					//
+					// Neither entry point can reach here while a recording is running, so bailing
+					// out is always safe to clean up after: a hold that lands during a
+					// transcription has already drawn its ring and attached the three window
+					// listeners, and both of onUp's own paths give up on `!state.active`. Without
+					// this the ring stays on screen for good and the listeners stay with it.
+					if (actions === undefined || actions === null || state.active || state.busy) {
+						clearTimer();
+						detach();
+						dropRing();
+						return;
+					}
 					const run = ++state.run;
 					// A hold that starts while a previous transcription is still in flight
 					// abandons that request: the run check discards its result anyway, and
@@ -2129,6 +2141,13 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 					 */
 					const touch = event.pointerType === 'touch' || event.pointerType === 'pen';
 					state.touch = touch;
+					/*
+					 * The three window listeners below are shared by every pointer on the screen,
+					 * so the gesture has to claim one and refuse the rest. Without this, a second
+					 * finger or a trackpad's second key drives the discard threshold and decides
+					 * whether this recording is kept or thrown away.
+					 */
+					state.pointerId = event.pointerId;
 					state.tolerance = touch ? TOUCH_TOLERANCE_PX : ARM_TOLERANCE_PX;
 					const holdMs = config.get(touch ? 'touchHoldMs' : 'holdMs');
 					state.x = event.clientX;
@@ -2159,6 +2178,7 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 				}
 
 				function onMove(event) {
+					if (event.pointerId !== state.pointerId) return;
 					if (state.active) {
 						// Drag-to-discard tracks the pointer 1:1 and stays reversible: the
 						// level it writes is what the bubble actually renders.
@@ -2178,6 +2198,7 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 				}
 
 				function onUp(event) {
+					if (event.pointerId !== state.pointerId) return;
 					if (state.timer !== 0) {
 						clearTimer();
 						detach();
@@ -2200,7 +2221,10 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 					else void finish();
 				}
 
-				function onCancel() {
+				function onCancel(event) {
+					// Only the pointer that opened the gesture may close it: another finger
+					// leaving the screen is not a reason to throw this recording away.
+					if (event.pointerId !== state.pointerId) return;
 					if (state.active) cancel(false);
 					else {
 						clearTimer();

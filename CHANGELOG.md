@@ -7,6 +7,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Holding the composer while a transcription is still in flight no longer strands the press
+  ring on screen or the gesture's three window listeners on the window. Both of the release
+  paths give up on "no recording is running", so the threshold itself now retracts the ring
+  and detaches before it abandons the press.
+- A second finger — or a trackpad's second key — can no longer drive the discard threshold or
+  decide whether a recording is kept or thrown away. The gesture now claims the pointer that
+  opened it and ignores every other one, including their `pointercancel`.
+
+### Changed
+
+- The published package ships the three images both READMEs reference, and drops `docs/logo.png`,
+  which nothing referenced. The tarball is about 1.0 MB rather than 827 kB: the demo recording
+  and two settings screenshots are larger than the unused logo was.
+- `npm test` gained a package check that runs `npm pack --dry-run` and fails when a README
+  points at a file the tarball does not ship; `npm run check` now defers to `npm test`.
+- Live dictation's "off by default" is asserted rather than assumed. The settings page test
+  reads the shipped default off an empty store, and a fresh install is exercised through the
+  release-to-transcribe path, so flipping the default can no longer pass the suite.
+
 ## [2.1.0] - 2026-10-02
 
 ### Added

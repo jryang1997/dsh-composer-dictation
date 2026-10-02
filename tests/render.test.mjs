@@ -573,6 +573,12 @@ let page = mountSettings();
 check(classes(page).includes('dsh-htt-set'), 'the settings page renders');
 check(findAll(page, 'dsh-htt-set-row').length >= 4, 'each setting gets its own row');
 check(find(page, 'dsh-htt-set-number').props.value === 300, 'the hold duration starts at its default');
+// This harness has no storage at all, so the page below renders the shipped defaults — which
+// makes it the one place the documented default can be observed rather than assumed. Live
+// dictation is the setting the README promises is off, and it is the one that streams the
+// recording to the provider while the user is still talking, so "off" gets an assertion.
+check(find(settingRow(page, 'live'), 'dsh-htt-set-toggle').props['aria-pressed'] === 'false',
+	'live dictation starts off, as the README promises');
 
 // The field is not a suggestion: a stored or typed value is fitted to the schema.
 const typeHold = (value) => find(mountSettings(), 'dsh-htt-set-number').props.onChange({ target: { value } });
