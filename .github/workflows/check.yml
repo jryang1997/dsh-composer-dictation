@@ -9,8 +9,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Pinned to commit SHAs rather than version tags: a tag is a name anyone with push
+      # access can move, and this workflow is the only thing standing between a bad edit
+      # and main. The cost of pinning is that these need refreshing by hand — the checkout
+      # pin is on v5 and the setup-node pin on v7, each the newest line still maintained.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
       # No dependencies and no build step: the plugin is plain JavaScript.
