@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-10-02
+
 ### Changed
 
 - A new voice-bubble icon pairs a rounded speech capsule with three waveform bars.
@@ -23,11 +25,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Long model labels no longer hide the hover hint when the tool row still has room.
+- Pointer entry remeasures the tool row; mounting under the pointer restores the hint
+  without requiring the pointer to leave and enter again.
 - The hover hint fades in and out softly over 320 ms, including calm and reduced motion.
 - The recording capsule has its glass background from the first frame. Entry fades the
   contents instead of an ancestor that would clip backdrop filtering.
 - Rendered transcript and failure buttons call the active gesture commands; pressing
   those controls cannot arm the composer's recording gesture.
+
+## [2.0.1] - 2026-10-01
+
+### Fixed
+
+- Hold-duration settings show their translated descriptions instead of dictionary keys.
+- The render check catches dictionary keys leaking into the settings page.
 
 ## [2.0.0] - 2026-10-01
 
@@ -313,7 +325,9 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.1...v2.0.2
+[2.0.1]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.5.2...v2.0.0
 [1.5.2]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.5.0...v1.5.1
