@@ -10,11 +10,14 @@ globalThis.Node = class {};
 function mount({ selected = false, live = true, location = 'host-local', workletAvailable = true, occurrences = [], stored } = {}) {
 	let component, worklet, tree, now = 0, cursor = 0, mounted = false;
 	let draft = selected ? '前旧后' : '前后', rev = 0;
-	const hooks = [], effects = [], listeners = new Map(), timers = new Map(), calls = [];
+	const hooks = [], effects = [], listeners = new Map(), timers = new Map(), calls = [], lifts = [];
 	const card = {
 		closest: () => card, matches: () => false, lastElementChild: null,
 		getBoundingClientRect: () => ({ left: 0, top: 0, right: 600, height: 84 }),
-		style: { setProperty() {} }, addEventListener: listen, removeEventListener: unlisten,
+		// The capsule is dragged by writing a CSS custom property, so recording these writes is
+		// the only way to see which pointer is actually driving the gesture.
+		style: { setProperty(name, value) { if (name === '--dsh-htt-lift') lifts.push(value); } },
+		addEventListener: listen, removeEventListener: unlisten,
 	};
 	function listen(type, fn) { listeners.set(type, [...listeners.get(type) ?? [], fn]); }
 	function unlisten(type, fn) { listeners.set(type, (listeners.get(type) ?? []).filter(x => x !== fn)); }
@@ -118,6 +121,15 @@ function mount({ selected = false, live = true, location = 'host-local', worklet
 		},
 		async finish() { fire('keyup', key); await flush(); },
 		async cancel() { fire('keydown', { ...key, key: 'Escape' }); await flush(); },
+		/** A pointer event on the card. `target: null` keeps the plugin-control guard out of the way. */
+		async pointer(type, over = {}) {
+			fire(type, { button: 0, pointerId: 1, pointerType: 'mouse', clientX: 100, clientY: 40, target: null, ...over });
+			await flush();
+		},
+		/** How many handlers the gesture currently has on this event type, anywhere. */
+		watchers: (type) => (listeners.get(type) ?? []).length,
+		/** How often the recording capsule has been dragged since the last snapshot. */
+		lifts: () => lifts.length,
 		edit(text) { draft = text; rev++; render(); },
 		dispose() { for (const fn of cleanups) fn(); },
 	};
@@ -217,6 +229,42 @@ assert.equal(fresh.calls.length, 0, 'a fresh install keeps live dictation off, a
 await fresh.finish(); await fresh.result(0, '松开识别');
 assert.equal(fresh.draft, '前后松开识别', 'a fresh install still transcribes on release');
 fresh.dispose();
+
+// A hold that lands while the previous transcription is still in flight cannot start a second
+// recording, but it has already drawn its ring and attached its three window listeners. Both of
+// onUp's own paths give up on "no recording is running", so begin() has to retract them.
+const superseded = mount({ live: false });
+await superseded.pointer('pointerdown');
+await superseded.advance(300);
+assert.ok(superseded.watchers('pointerup') > 0, 'a live gesture listens on the window');
+await superseded.pointer('pointerup');
+assert.equal(superseded.calls.length, 1, 'the first recording is still transcribing');
+await superseded.pointer('pointerdown', { pointerId: 2 });
+await superseded.advance(300);
+assert.equal(superseded.watchers('pointermove'), 0, 'a press abandoned mid-transcription detaches its window listeners');
+assert.equal(superseded.watchers('pointerup'), 0, 'an abandoned press leaves no pointerup listener behind');
+assert.equal(superseded.watchers('pointercancel'), 0, 'an abandoned press leaves no pointercancel listener behind');
+assert.equal(superseded.calls.length, 1, 'the abandoned press spends no provider call');
+superseded.dispose();
+
+// Those window listeners serve every pointer on the screen, so a second finger must not be
+// able to decide the fate of a recording the first finger is still making.
+const secondFinger = mount({ live: false });
+await secondFinger.pointer('pointerdown', { pointerId: 1 });
+await secondFinger.advance(300);
+const atRest = secondFinger.lifts();
+await secondFinger.pointer('pointermove', { pointerId: 2, clientY: 0 });
+assert.equal(secondFinger.lifts(), atRest, 'a foreign pointer cannot drag the recording capsule');
+await secondFinger.pointer('pointerup', { pointerId: 2, clientY: 0 });
+assert.equal(secondFinger.calls.length, 0, 'a foreign pointer cannot end the recording it did not start');
+// A cancelled recording would swallow the release below without ever calling the Host, so the
+// count at the end is what proves the foreign cancel was ignored rather than obeyed.
+await secondFinger.pointer('pointercancel', { pointerId: 3 });
+await secondFinger.pointer('pointermove', { pointerId: 1, clientY: 30 });
+assert.ok(secondFinger.lifts() > atRest, 'the pointer that started the recording still moves the capsule');
+await secondFinger.pointer('pointerup', { pointerId: 1 });
+assert.equal(secondFinger.calls.length, 1, 'the recording survives a foreign move, a foreign release and a foreign cancel');
+secondFinger.dispose();
 
 for (const options of [{ live: false }, { location: 'cloud' }, { workletAvailable: false }, { occurrences: [{}] }]) {
 	const fallback = mount(options);

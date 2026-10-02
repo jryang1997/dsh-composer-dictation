@@ -16,6 +16,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A second finger — or a trackpad's second key — can no longer drive the discard threshold or
   decide whether a recording is kept or thrown away. The gesture now claims the pointer that
   opened it and ignores every other one, including their `pointercancel`.
+- Both are covered by regression tests that drive real gestures: reverting either fix, or any
+  one of the three pointer guards, fails `npm test` with a named assertion.
 
 ### Changed
 
