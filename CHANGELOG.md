@@ -7,6 +7,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Optional live dictation through the official local speech module: rolling audio
+  recognition updates the draft while recording, with whole-recording finalization
+  on release. Revision guards protect manual edits and cancel provisional text safely.
+  Unsupported environments, reference-chip drafts and cloud providers keep one-shot input.
+
 ## [2.0.2] - 2026-10-02
 
 ### Changed

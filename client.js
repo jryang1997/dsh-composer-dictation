@@ -53,6 +53,7 @@ window.__ModuleLoader__.load({
 		const MAX_SECONDS = 110;
 		/** Kept below the Host default (4 MiB) so the Host never rejects on size. */
 		const MAX_BYTES = 4 * 1024 * 1024 - 4096;
+		const LIVE_INTERVAL_MS = 1000;
 		/** How long a transient surface takes to leave, and how long the press ring retracts. */
 		const EXIT_MS = 180;
 		const RING_EXIT_MS = 140;
@@ -133,6 +134,7 @@ window.__ModuleLoader__.load({
 			motion: { fallback: 'full', oneOf: ['full', 'calm'], kind: 'choice' },
 			hint: { fallback: true, kind: 'switch' },
 			chord: { fallback: 'Control+Shift+Space', oneOf: Object.keys(CHORDS), kind: 'choice' },
+			live: { fallback: false, kind: 'switch' },
 		};
 
 		const configDefaults = () => Object.fromEntries(
@@ -298,6 +300,8 @@ window.__ModuleLoader__.load({
 			chordLabel: '键盘快捷键',
 			chordHint: '按住这个组合键同样可以说话，松开即转写。',
 			chordOff: '关闭',
+			liveLabel: '边说边出字（实验）',
+			liveHint: '录音时滚动识别，文字可能修正；松开后整段定稿。仅对本地语音服务启用。',
 			settingsReset: '恢复默认',
 			settingsLocal: '单位：毫秒',
 		};
@@ -339,6 +343,8 @@ window.__ModuleLoader__.load({
 			chordLabel: 'Keyboard shortcut',
 			chordHint: 'Hold this chord to dictate without a mouse; letting go transcribes.',
 			chordOff: 'Off',
+			liveLabel: 'Live dictation (experimental)',
+			liveHint: 'Recognize while recording; words may be revised. Release to finalize the whole recording. Local speech providers only.',
 			settingsReset: 'Restore defaults',
 			settingsLocal: 'milliseconds',
 		};
@@ -429,8 +435,12 @@ window.__ModuleLoader__.load({
 		}
 
 		/** One microphone capture: permission, chunks, live level, and the encoded result. */
-		function createCapture() {
+		function createCapture(live = false) {
 			const chunks = [];
+			const pcm = [];
+			let frames = 0;
+			let source = null;
+			let worklet = null;
 			let stream = null;
 			let recorder = null;
 			let context = null;
@@ -448,6 +458,13 @@ window.__ModuleLoader__.load({
 				}
 				if (stream !== null) for (const track of stream.getTracks()) track.stop();
 				stream = null;
+				if (worklet !== null) {
+					worklet.port.onmessage = null;
+					worklet.port.close();
+					worklet.disconnect();
+				}
+				if (source !== null) source.disconnect();
+				pcm.length = 0;
 				recorder = null;
 				analyser = null;
 				if (context !== null) {
@@ -477,7 +494,49 @@ window.__ModuleLoader__.load({
 					context = new AudioContext();
 					analyser = context.createAnalyser();
 					analyser.fftSize = 256;
-					context.createMediaStreamSource(stream).connect(analyser);
+					source = context.createMediaStreamSource(stream);
+					source.connect(analyser);
+					if (live && context.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
+						// PCM snapshots are independent WAVs; partial MediaRecorder containers
+						// cannot reliably be decoded before their final header is written.
+						const url = URL.createObjectURL(new Blob([`
+class DictationPCM extends AudioWorkletProcessor {
+  constructor() { super(); this.buffer = new Float32Array(4096); this.used = 0; }
+  process(inputs) {
+    const input = inputs[0]?.[0];
+    if (input) for (const sample of input) {
+      this.buffer[this.used++] = sample;
+      if (this.used === this.buffer.length) {
+        this.port.postMessage(this.buffer, [this.buffer.buffer]);
+        this.buffer = new Float32Array(4096); this.used = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('dsh-dictation-pcm', DictationPCM);
+`], { type: 'text/javascript' }));
+						try {
+							await context.audioWorklet.addModule(url);
+							if (released) return;
+							worklet = new AudioWorkletNode(context, 'dsh-dictation-pcm');
+							worklet.port.onmessage = ({ data }) => {
+								if (released || !(data instanceof Float32Array)) return;
+								const chunk = data.subarray(0, Math.max(0, Math.floor(context.sampleRate * MAX_SECONDS) - frames));
+								if (chunk.length === 0) return;
+								pcm.push(chunk); frames += chunk.length;
+							};
+							source.connect(worklet);
+							// The processor has silent outputs; keeping it connected keeps capture live.
+							worklet.connect(context.destination);
+						} catch (error) {
+							// Worklet/CSP support is optional; whole-recording dictation still works.
+							console.warn('dsh-hold-to-dictate: live audio unavailable', error);
+						} finally {
+							URL.revokeObjectURL(url);
+						}
+					}
+					if (released) return;
 					recorder = new MediaRecorder(stream);
 					recorder.addEventListener('dataavailable', (event) => {
 						if (event.data !== undefined && event.data.size > 0) chunks.push(event.data);
@@ -488,6 +547,21 @@ window.__ModuleLoader__.load({
 						failure = event?.error instanceof Error ? event.error : new Error('recorder-failed');
 					});
 					recorder.start(200);
+				},
+				async snapshot() {
+					if (released || frames < context.sampleRate * MIN_SECONDS) return null;
+					const samples = new Float32Array(frames);
+					let offset = 0;
+					for (const chunk of pcm) { samples.set(chunk, offset); offset += chunk.length; }
+					const rate = context.sampleRate;
+					if (rate === 16000) return { buffer: encodeWave(samples), seconds: frames / rate };
+					const offline = new OfflineAudioContext(1, Math.round(samples.length * 16000 / rate), 16000);
+					const buffer = offline.createBuffer(1, samples.length, rate);
+					buffer.copyToChannel(samples, 0);
+					const node = offline.createBufferSource();
+					node.buffer = buffer; node.connect(offline.destination); node.start(0);
+					const rendered = await offline.startRendering();
+					return { buffer: encodeWave(rendered.getChannelData(0)), seconds: rendered.duration };
 				},
 				/**
 				 * RMS amplitude of the current frame — the same measure the shipped voice input
@@ -1222,6 +1296,15 @@ window.__ModuleLoader__.load({
 					),
 				),
 				row(
+					'live', t('liveLabel'), t('liveHint'),
+					h('button', {
+						type: 'button', className: 'dsh-htt-set-toggle',
+						'aria-pressed': values.live ? 'true' : 'false',
+						'data-on': values.live ? '' : undefined,
+						onClick: () => config.set('live', !values.live),
+					}, t(values.live ? 'switchOn' : 'switchOff')),
+				),
+				row(
 					'chord',
 					t('chordLabel'),
 					t('chordHint'),
@@ -1267,6 +1350,26 @@ window.__ModuleLoader__.load({
 
 		//#region component
 
+		/** Replace only this recording's plain-text range, guarded by the Host revision. */
+		function createLiveDraft(actions, input, span) {
+			if (!input || typeof input.draft !== 'string' || input.draftRev !== span.draftRev
+				|| !Array.isArray(input.occurrences) || input.occurrences.length > 0
+				|| span.start < 0 || span.end > input.draft.length) return null;
+			const original = input.draft.slice(span.start, span.end);
+			let range = { ...span }, text = original, changed = false, conflict = false;
+			const write = (value) => {
+				if (conflict) return false;
+				if (actions.captureInsertion().draftRev !== range.draftRev) { conflict = true; return false; }
+				const clean = value.replace(/[\uE100-\uE11D\uFFFC]/gu, '');
+				if (text === clean) return true;
+				if (actions.insertText(clean, range) !== true) { conflict = true; return false; }
+				range = { start: span.start, end: span.start + clean.length, draftRev: actions.captureInsertion().draftRev };
+				text = clean; changed = true;
+				return true;
+			};
+			return { write, rollback: () => !changed || write(original) };
+		}
+
 		/** Prefer the entry's injected `transcribe`; fall back to the Remote captured at activation. */
 		function resolveTranscribe(props) {
 			if (typeof props.transcribe === 'function') return props.transcribe;
@@ -1290,6 +1393,7 @@ window.__ModuleLoader__.load({
 		 */
 
 		function HoldToTalk(props) {
+			const input = typeof props.useInput === 'function' ? props.useInput((snapshot) => snapshot) : null;
 			const root = React.useRef(null);
 			const wave = React.useRef(null);
 			const commands = React.useRef({});
@@ -1297,7 +1401,7 @@ window.__ModuleLoader__.load({
 			const [view, setView] = React.useState(IDLE);
 			const [box, setBox] = React.useState({ height: 0, rowHeight: 0, hintRight: 14, hintMax: 0 });
 			const latest = React.useRef(null);
-			latest.current = { props, view, setHovered, setView };
+			latest.current = { props, input, view, setHovered, setView };
 			/*
 			 * Settings are read through `config` at the moment they are needed, but the layer has
 			 * to re-render when one changes: the motion preference and the ring's hold duration
@@ -1379,6 +1483,9 @@ window.__ModuleLoader__.load({
 				window.addEventListener('resize', measure);
 
 				const state = {
+					liveDraft: null,
+					liveTimer: 0,
+					preview: null,
 					timer: 0,
 					limit: 0,
 					noticeHold: 0,
@@ -1554,7 +1661,7 @@ window.__ModuleLoader__.load({
 					if (pending === null || state.busy) return;
 					state.retry = null;
 					state.busy = true;
-					void transmit(pending.audio, pending.span, state.run);
+					void transmit(pending.audio, pending.span, state.run, pending.liveDraft);
 				};
 
 				const clearTimer = () => {
@@ -1659,6 +1766,9 @@ window.__ModuleLoader__.load({
 				};
 
 				const cancel = (silent) => {
+					clearTimeoutOf('liveTimer');
+					state.liveDraft?.rollback();
+					state.liveDraft = null;
 					clearTimer();
 					clearLimit();
 					detach();
@@ -1778,9 +1888,13 @@ window.__ModuleLoader__.load({
 					// was offering to retry.
 					state.retry = null;
 					state.span = actions.captureInsertion();
+					state.preview = null;
+					const provider = runtime.limits?.providers?.find((provider) => provider.id === runtime.limits.selection?.providerId);
+					state.liveDraft = config.get('live') && provider?.location === 'host-local'
+						? createLiveDraft(actions, latest.current.input, state.span) : null;
 					state.abort = new AbortController();
 					resetGesture();
-					const capture = createCapture();
+					const capture = createCapture(state.liveDraft !== null);
 					state.capture = capture;
 					state.waveLines = null;
 					state.waveLevels = null;
@@ -1809,7 +1923,10 @@ window.__ModuleLoader__.load({
 					state.starting = starting;
 					try {
 						await starting;
-						if (run === state.run) state.recordedAt = performance.now();
+						if (run === state.run) {
+							state.recordedAt = performance.now();
+							if (state.active && state.liveDraft !== null) schedulePreview(capture, run);
+						}
 					} catch (error) {
 						if (run !== state.run) return;
 						stopMeter(false);
@@ -1822,12 +1939,44 @@ window.__ModuleLoader__.load({
 					}
 				}
 
+				function schedulePreview(capture, run) {
+					// As the prefix grows, reduce repeated inference on long dictations.
+					const delay = Math.max(LIVE_INTERVAL_MS, Math.min(5000, state.elapsed * 50));
+					state.liveTimer = window.setTimeout(() => {
+						state.liveTimer = 0;
+						if (run !== state.run || !state.active) return;
+						// ponytail: complete prefixes repeat work up to the 110s cap; sentence
+						// checkpoints are the upgrade if measured long-dictation CPU cost matters.
+						state.preview = (async () => {
+							try {
+								const audio = await capture.snapshot();
+								if (!audio || run !== state.run || !state.active) return false;
+								if (audio.buffer.byteLength > Math.min(MAX_BYTES, runtime.limits?.maxAudioBytes ?? MAX_BYTES)) return false;
+								const transcribe = resolveTranscribe(latest.current.props);
+								if (!transcribe) return false;
+								const result = await transcribe({ audioBase64: toBase64(audio.buffer) }, state.abort.signal);
+								if (run !== state.run || !state.active) return false;
+								if (result?.ok !== true) return false;
+								const text = result.value?.text ?? '';
+								return text === '' || state.liveDraft.write(text);
+							} catch (error) { return false; }
+						})();
+						void state.preview.then((again) => {
+							// One request at a time; slow inference never builds a stale queue.
+							if (again && run === state.run && state.active) schedulePreview(capture, run);
+						});
+					}, delay);
+				}
+
 				async function finish() {
 					const capture = state.capture;
 					const abort = state.abort;
 					const span = state.span;
 					const starting = state.starting;
 					const run = state.run;
+					const liveDraft = state.liveDraft;
+					const preview = state.preview;
+					clearTimeoutOf('liveTimer');
 					state.active = false;
 					state.keyboard = false;
 					state.capture = null;
@@ -1850,6 +1999,8 @@ window.__ModuleLoader__.load({
 						if (run !== state.run) return;
 						const audio = await capture.stop();
 						if (run !== state.run) return;
+						await preview;
+						if (run !== state.run) return;
 						if (audio.seconds < MIN_SECONDS) {
 							// Saying nothing is the one outcome that used to be silent, and a
 							// keyboard chord makes it easy to hit by accident.
@@ -1863,7 +2014,7 @@ window.__ModuleLoader__.load({
 							fail(say('tooLarge'), null);
 							return;
 						}
-						await transmit(audio, span, run);
+						await transmit(audio, span, run, liveDraft);
 					} catch (error) {
 						// A stale run's failure must stay invisible: the current run owns `busy`,
 						// and clearing it here would break Esc for that run.
@@ -1883,7 +2034,7 @@ window.__ModuleLoader__.load({
 				 * asking the user to say the same thing again. The audio is handed back on
 				 * failure so the failure card can offer exactly that.
 				 */
-				async function transmit(audio, span, run) {
+				async function transmit(audio, span, run, liveDraft = null) {
 					const transcribe = resolveTranscribe(latest.current.props);
 					if (typeof transcribe !== 'function') {
 						state.busy = false;
@@ -1902,17 +2053,18 @@ window.__ModuleLoader__.load({
 						if (run !== state.run) return;
 						state.busy = false;
 						if (result === undefined || result.ok !== true) {
-							fail(failureNotice(result?.error?.message ?? ''), { audio, span });
+							fail(failureNotice(result?.error?.message ?? ''), { audio, span, liveDraft });
 							return;
 						}
 						const transcript = result.value?.text ?? '';
 						if (transcript === '') {
+							liveDraft?.rollback();
 							state.retry = null;
 							show({ phase: 'notice', notice: say('empty'), tone: 'info', cancelled: false });
 							return;
 						}
 						const actions = latest.current.props.inputActions;
-						if (actions === undefined || actions.insertText(transcript, span) !== true) {
+						if (actions === undefined || (liveDraft ? liveDraft.write(transcript) : actions.insertText(transcript, span)) !== true) {
 							// Keep the text: the draft moved on, so the user decides when to insert it.
 							state.retry = null;
 							show({ phase: 'idle', notice: '', pending: transcript });
@@ -1923,7 +2075,7 @@ window.__ModuleLoader__.load({
 					} catch (error) {
 						if (run !== state.run) return;
 						state.busy = false;
-						fail(failure(error), { audio, span });
+						fail(failure(error), { audio, span, liveDraft });
 					}
 				}
 
@@ -2162,6 +2314,8 @@ window.__ModuleLoader__.load({
 					clearTimer();
 					clearLimit();
 					clearNotice();
+					clearTimeoutOf('liveTimer');
+					if (state.active || state.busy) state.liveDraft?.rollback();
 					clearBubbleExit();
 					clearPendingExit();
 					clearTimeoutOf('ringExit');

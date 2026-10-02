@@ -37,6 +37,10 @@ silently:
 
 If you add a surface, add its exit here too.
 
+`tests/live.test.mjs` exercises the registered slot through the audio and speech-service
+boundaries: provisional and final draft updates, guarded rollback, manual edits, slow
+responses, cancellation, retry and one-shot fallback.
+
 ## Two rules that are easy to break
 
 **Reuse the turn's own tokens.** Colours come from `--dsw-alias-*`; the surface, radius and

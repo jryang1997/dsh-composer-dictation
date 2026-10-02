@@ -58,6 +58,10 @@ Replace `<profile>` with your profile name. The desktop app manages its `desktop
 
 Under **Settings → Plugins → Hold to talk**, adjust hold duration, keyboard shortcut, hover hint and motion.
 
+Enable **Live dictation (experimental)** to recognize while recording through the official local speech module. Actual recognition results update the draft and may revise earlier words; release to finalize the whole recording. Off by default. Short recordings request recognition about once a second, with additional model startup and inference latency; longer recordings refresh less often. This is rolling recognition, not a native token stream.
+
+Live mode requires a local speech provider and a plain-text draft without reference chips. Unsupported environments retain release-to-transcribe. Manual editing stops automatic replacements and keeps the final result available for explicit insertion. Cancellation rolls back provisional text only while the recording still owns the draft revision, preserving manual edits.
+
 <p align="center">
   <img src="docs/settings-user.png" width="960" alt="Hold to talk settings: mouse and touch hold durations, motion, hover hint and keyboard shortcut">
 </p>

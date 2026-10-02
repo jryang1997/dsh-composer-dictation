@@ -140,9 +140,28 @@ Host contract (`dsh-experimental-api-speech-to-text/lib/index.js`):
 This plugin omits `providerId` and `language` so the Host applies its own configuration,
 which sidesteps provider language whitelists entirely.
 
+## Experimental live dictation
+
+The opt-in `live` setting reuses the same official `speech.transcribe` call. A silent
+AudioWorklet captures continuous PCM alongside MediaRecorder; each preview is an independent
+16 kHz mono PCM16 WAV of the growing recording. Partial WebM containers are never decoded for
+previews. MediaRecorder retains the complete audio for final recognition on release.
+
+Exactly one preview is in flight. The next snapshot is captured after its response and a
+1–5 second delay that grows with recording length; release stops capture, waits for the
+active preview, and makes one final call. Refreshes never abort the worker. Prefixes repeat
+computation, so long dictations cost more; the existing 110-second limit still applies.
+
+Live insertion uses `useInput` and revision-guarded `InputActions.insertText`, replacing only
+the recording's own text range. Original selected text is retained for cancellation. Manual
+edits or undo revoke ownership and block replacement and rollback. Final rejected text uses
+the existing retained-transcript action; retry carries the same owned range to avoid duplicates.
+Reference-chip drafts, cloud providers, missing input hooks and unavailable AudioWorklets
+retain one-shot recognition. Native token streaming remains unavailable in the Host API.
+
 ## Deliberate non-goals
 
-- No streaming transcript: the Host API is one-shot over a complete recording.
+- No native streaming protocol or third-party recognizer: previews use complete WAV calls.
 - No auto-send: the transcript lands in the draft, where it stays editable.
 - No DOM writes outside the plugin's own subtree, and no reading of other plugins' DOM —
   the only host node touched is the card the plugin is already mounted inside.
