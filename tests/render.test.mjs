@@ -109,7 +109,7 @@ const rect = (left, top, width, height) => ({
 });
 
 /** The card, its tool row, and two children so `measure()` finds a trailing group. */
-const fakeCard = () => {
+const fakeCard = (trailingLeft = 380) => {
 	const node = {
 		...rect(0, 100, 600, 84),
 		style: { setProperty: () => undefined },
@@ -117,12 +117,13 @@ const fakeCard = () => {
 		removeEventListener: unlisten,
 		contains: () => true,
 		querySelectorAll: () => [],
+		matches: () => false,
 	};
 	node.lastElementChild = {
 		...rect(0, 142, 600, 42),
 		children: [
 			{ ...rect(8, 148, 120, 30) },      // the leading controls
-			{ ...rect(380, 148, 212, 34) },    // the trailing group
+			{ ...rect(trailingLeft, 148, 592 - trailingLeft, 34) }, // the trailing group
 		],
 	};
 	node.closest = () => node;
@@ -304,14 +305,14 @@ const inputActions = {
  * Mount the component once, with a fresh DOM and listener registry, and leave the effect
  * attached so the keyboard path can be driven afterwards.
  */
-const render = (hovered, view, box = BOX, props = {}) => {
+const render = (hovered, view, box = BOX, props = {}, card = fakeCard()) => {
 	for (const cleanup of cleanups) cleanup();
 	cleanups = [];
 	listeners.clear();
 	setCalls.length = 0;
 	preset = [hovered, view, box];
 	hookIndex = 0;
-	refQueue = [{ current: fakeCard() }, { current: { querySelectorAll: () => [] } }];
+	refQueue = [{ current: card }, { current: { querySelectorAll: () => [] } }];
 	return component({ t: undefined, inputActions, ...props });
 };
 
@@ -350,6 +351,28 @@ check(centredHint.props.style.bottom === undefined, 'with no second, conflicting
 const unmeasuredHint = find(render(true, IDLE, { ...BOX, hintCentre: null }), 'dsh-htt-hint');
 check(unmeasuredHint.props.style.bottom !== undefined && unmeasuredHint.props.style.top === undefined,
 	'and it falls back to the row box before anything has been measured');
+
+// A long model label can start left of centre while leaving room for the hint.
+const longModelCard = fakeCard(240);
+render(false, IDLE, BOX, {}, longModelCard);
+const longModelBox = setCalls.find((call) => call && typeof call === 'object' && 'hintMax' in call);
+check(longModelBox?.hintMax === 88, 'a long model label still leaves the real 88 px gap');
+fire('pointerenter', {});
+check(setCalls.includes(true), 'pointer entry enables the hover hint');
+check(find(render(true, IDLE, longModelBox, {}, longModelCard), 'dsh-htt-hint').props['data-on'] === '',
+	'the hint fades in beside a model label that starts left of centre');
+
+// Slot contents may change width without resizing the card itself.
+render(false, IDLE);
+setCalls.length = 0;
+fire('pointerenter', {});
+check(setCalls.some((call) => call && typeof call === 'object' && 'hintMax' in call),
+	'pointer entry remeasures the current tool row');
+
+const alreadyHoveredCard = fakeCard();
+alreadyHoveredCard.matches = () => true;
+render(false, IDLE, BOX, {}, alreadyHoveredCard);
+check(setCalls.includes(true), 'mounting under the pointer enables the hint without a second entry');
 
 // Recording: a floating capsule, and the composer itself is left alone.
 tree = render(true, { ...IDLE, phase: 'recording' });

@@ -1339,9 +1339,8 @@ window.__ModuleLoader__.load({
 				 * its last element child is the tool row.
 				 *
 				 * The hint is aimed at that row's empty middle: the row is
-				 * `justify-content: space-between`, so its trailing group is the first child
-				 * whose box starts in the right half, and the gap in front of that group is the
-				 * one place a hint can sit without covering a control *or* the user's own
+				 * `justify-content: space-between`, with the trailing group last. The gap in front
+				 * is where a hint can sit without covering a control or the user's own
 				 * writing. When no such gap exists the hint is dropped rather than overlapped.
 				 */
 				const measure = () => {
@@ -1355,7 +1354,7 @@ window.__ModuleLoader__.load({
 						const rowRect = row.getBoundingClientRect();
 						rowHeight = rowRect.height;
 						const boxes = collectBoxes(row);
-						const trailing = boxes.find((child) => child.left > rowRect.left + rowRect.width / 2);
+						const trailing = boxes.at(-1);
 						if (trailing !== undefined) {
 							hintRight = Math.max(12, rect.right - trailing.left + 12);
 							const leading = boxes.filter((child) => child.right <= trailing.left - 12).pop();
@@ -2043,6 +2042,7 @@ window.__ModuleLoader__.load({
 				}
 
 				const onEnter = () => {
+					measure();
 					latest.current.setHovered(true);
 					// Coming back onto the card forgives a discard that was only armed.
 					if (state.active) {
@@ -2136,6 +2136,7 @@ window.__ModuleLoader__.load({
 				card.addEventListener('pointerdown', onPointerDown, true);
 				card.addEventListener('pointerenter', onEnter);
 				card.addEventListener('pointerleave', onLeave);
+				latest.current.setHovered(card.matches(':hover'));
 				document.addEventListener('keydown', onKeyDown, true);
 				document.addEventListener('keyup', onKeyUp, true);
 				document.addEventListener('contextmenu', onSuppress, true);

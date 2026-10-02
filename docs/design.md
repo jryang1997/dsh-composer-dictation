@@ -78,10 +78,11 @@ takes a pointer event.
 The hint is the one element here that is bare text rather than an opaque chip, so it is the
 one that can ruin a long draft by sitting on top of it. It is therefore parked in the tool
 row (`card.lastElementChild`) rather than in the editor area. That row is
-`justify-content: space-between`, so its trailing group is the first child whose box starts
-in the right half; the hint is right-aligned to the gap in front of that group and clipped to
+`justify-content: space-between`, with the trailing group last even when a long model label
+starts left of centre; the hint is right-aligned to the gap in front of that group and clipped to
 the gap's width. When the gap is under 48 px the hint is dropped instead of overlapped.
 
+Pointer entry remeasures the gap, and mounting under the pointer sets the initial hover state.
 This reads only the card's own subtree — the row is `card.lastElementChild`, the same node
 the height measurement already used — and writes nothing outside the plugin's layer.
 
