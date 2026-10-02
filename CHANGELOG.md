@@ -7,12 +7,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-02
+
 ### Added
 
 - Optional live dictation through the official local speech module: rolling audio
   recognition updates the draft while recording, with whole-recording finalization
   on release. Revision guards protect manual edits and cancel provisional text safely.
   Unsupported environments, reference-chip drafts and cloud providers keep one-shot input.
+- Real usage GIF and two settings screenshots in the Chinese and English README.
+
+### Fixed
+
+- Cancelling live dictation removes unchanged provisional words while preserving manual
+  additions outside their range. Edits inside that range are kept with an explicit notice.
+- Late preview results cannot affect a cancelled or newer recording, and retry replaces
+  provisional words instead of inserting a duplicate transcript.
+
+### Changed
+
+- One preview request at a time, with slower refreshes on long recordings to limit repeated
+  recognition work. Live-dictation checks now run locally and in GitHub Actions.
 
 ## [2.0.2] - 2026-10-02
 
@@ -332,7 +347,8 @@ First release — the hold-to-talk gesture and everything it needs to be safe to
 - Localised `zh` / `en`; light and dark themes; graceful degradation when a host contract is
   missing.
 
-[Unreleased]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/jryang1997/dsh-hold-to-dictate/compare/v1.5.2...v2.0.0

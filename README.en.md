@@ -60,13 +60,13 @@ Under **Settings → Plugins → Hold to talk**, adjust hold duration, keyboard 
 
 Enable **Live dictation (experimental)** to recognize while recording through the official local speech module. Actual recognition results update the draft and may revise earlier words; release to finalize the whole recording. Off by default. Short recordings request recognition about once a second, with additional model startup and inference latency; longer recordings refresh less often. This is rolling recognition, not a native token stream.
 
-Live mode requires a local speech provider and a plain-text draft without reference chips. Unsupported environments retain release-to-transcribe. Manual editing stops automatic replacements and keeps the final result available for explicit insertion. Cancellation rolls back provisional text only while the recording still owns the draft revision, preserving manual edits.
+Live mode requires a local speech provider and a plain-text draft without reference chips. Unsupported environments retain release-to-transcribe. Manual editing stops automatic replacements and keeps the final result available for explicit insertion. Cancellation removes unchanged provisional words while preserving manual additions outside their range. Edits inside that range are kept with an explicit notice.
 
 <p align="center">
   <img src="docs/settings-user.png" width="960" alt="Hold to talk settings: mouse and touch hold durations, motion, hover hint and keyboard shortcut">
 </p>
 
-The settings screenshot shows v1.5.2. The current version fixes the description text and updates the plugin name and icon.
+The settings screenshot shows v1.5.2. The current version fixes the description text and updates the plugin name and icon. These older screenshots do not show the new v2.1.0 live-dictation toggle.
 
 <details>
 <summary>Another settings screenshot</summary>
@@ -79,6 +79,8 @@ The settings screenshot shows v1.5.2. The current version fixes the description 
 
 ## Update or uninstall
 
+**After updating to v2.1.0**, reload the page and enable **Live dictation (experimental)** under **Settings → Plugins → Hold to talk** to update the draft while recording. Leave it off to retain release-to-transcribe.
+
 GitHub installs do not update automatically. To update, send this to your Harness Agent:
 
 ```text
@@ -87,6 +89,8 @@ action: remove_bundle, target: @jryang1997/dsh-hold-to-dictate.
 Then install with action: install_bundle, target: github:jryang1997/dsh-hold-to-dictate.
 Remind me to reload the page. Keep the official voice-input module installed.
 ```
+
+If you still have the v1.x package `@jryang1997/dsh-composer-dictation`, ask the Agent to remove it first, then install the new package above to avoid activating both plugins. Existing local settings are preserved.
 
 To uninstall, ask the Agent to remove `@jryang1997/dsh-hold-to-dictate`.
 

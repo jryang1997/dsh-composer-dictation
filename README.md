@@ -65,7 +65,7 @@ dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-dictate
   <img src="docs/settings-user.png" width="960" alt="按住说话的设置页面：长按时长、触屏长按时长、动效、悬停提示及键盘快捷键">
 </p>
 
-设置截图来自旧版 v1.5.2；当前版本已修复图中的说明文字，并更新了插件名称和图标。
+设置截图来自旧版 v1.5.2；当前版本已修复图中的说明文字，并更新了插件名称和图标。v2.1.0 新增的「边说边出字（实验）」开关未出现在这些旧截图中。
 
 <details>
 <summary>另一张设置截图</summary>
@@ -78,6 +78,8 @@ dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-dictate
 
 ## 更新或卸载
 
+**v2.1.0 更新后**，刷新页面，在 **设置 → 插件 → 按住说话** 中开启 **边说边出字（实验）**，即可试用录音时更新草稿；不开启时沿用松开识别。
+
 GitHub 安装不会自动更新。需要更新时，把这段交给 Harness 里的 Agent：
 
 ```text
@@ -86,6 +88,8 @@ target: @jryang1997/dsh-hold-to-dictate 移除旧安装，再以 action: install
 target: github:jryang1997/dsh-hold-to-dictate 安装，并提示我刷新页面。
 保留官方语音输入模块。
 ```
+
+如果仍安装的是 v1.x 的旧包 `@jryang1997/dsh-composer-dictation`，先让 Agent 移除这个旧包，再安装上面的新包，避免同时启用两份插件。原有本机设置会保留。
 
 只需卸载时，让 Agent 移除 `@jryang1997/dsh-hold-to-dictate` 即可。
 

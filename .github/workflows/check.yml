@@ -24,3 +24,5 @@ jobs:
         run: node tests/locales.test.mjs
       - name: Render every gesture state
         run: node tests/render.test.mjs
+      - name: Check live dictation and safe cancellation
+        run: node tests/live.test.mjs
