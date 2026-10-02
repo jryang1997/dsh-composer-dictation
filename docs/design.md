@@ -154,7 +154,9 @@ computation, so long dictations cost more; the existing 110-second limit still a
 
 Live insertion uses `useInput` and revision-guarded `InputActions.insertText`, replacing only
 the recording's own text range. Original selected text is retained for cancellation. Manual
-edits or undo revoke ownership and block replacement and rollback. Final rejected text uses
+edits or undo revoke automatic replacement. Cancellation can still restore an unchanged
+owned range when the current input snapshot proves its prefix and text are intact; edits
+inside that range are preserved with an explicit notice. Final rejected text uses
 the existing retained-transcript action; retry carries the same owned range to avoid duplicates.
 Reference-chip drafts, cloud providers, missing input hooks and unavailable AudioWorklets
 retain one-shot recognition. Native token streaming remains unavailable in the Host API.

@@ -183,6 +183,19 @@ await restart.result(1, '新录音'); await restart.result(0, '旧录音');
 assert.equal(restart.draft, '前后新录音');
 restart.dispose();
 
+const editedOutside = mount();
+await editedOutside.start(); await editedOutside.samples(); await editedOutside.advance(); await editedOutside.result(0, '语音');
+editedOutside.edit('前后语音手写');
+await editedOutside.cancel();
+assert.equal(editedOutside.draft, '前后手写', 'cancel removes unchanged voice text while preserving manual additions outside it');
+editedOutside.dispose();
+
+const editedInside = mount();
+await editedInside.start(); await editedInside.samples(); await editedInside.advance(); await editedInside.result(0, '语音');
+editedInside.edit('前后我改过的语音'); await editedInside.cancel();
+assert.equal(editedInside.draft, '前后我改过的语音', 'cancel preserves manual edits inside the former voice range');
+editedInside.dispose();
+
 const retry = mount();
 await retry.start(); await retry.samples(); await retry.advance(); await retry.result(0, '预览');
 await retry.finish(); await retry.failure(1); await retry.retry(); await retry.result(2, '完整识别');

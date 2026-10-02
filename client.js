@@ -271,6 +271,7 @@ window.__ModuleLoader__.load({
 			transcribing: '识别中',
 			complete: '已插入草稿',
 			cancelled: '已取消',
+			cancelledEdited: '已停止录音；草稿有改动，保留现有文字',
 			empty: '没有识别到内容，可以说长一点再试',
 			tooShort: '太短了，按住再多说一会儿',
 			conflict: '草稿已改动，转写结果保留在右下角',
@@ -314,6 +315,7 @@ window.__ModuleLoader__.load({
 			transcribing: 'Transcribing',
 			complete: 'Added to draft',
 			cancelled: 'Cancelled',
+			cancelledEdited: 'Recording stopped; draft edits were preserved',
 			empty: 'Nothing was recognized — try speaking a little longer',
 			tooShort: 'Too short — hold a little longer',
 			conflict: 'Draft changed; the transcript is kept at the lower right',
@@ -1351,7 +1353,7 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 		//#region component
 
 		/** Replace only this recording's plain-text range, guarded by the Host revision. */
-		function createLiveDraft(actions, input, span) {
+		function createLiveDraft(actions, input, span, getInput) {
 			if (!input || typeof input.draft !== 'string' || input.draftRev !== span.draftRev
 				|| !Array.isArray(input.occurrences) || input.occurrences.length > 0
 				|| span.start < 0 || span.end > input.draft.length) return null;
@@ -1367,7 +1369,21 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 				text = clean; changed = true;
 				return true;
 			};
-			return { write, rollback: () => !changed || write(original) };
+			return { write, rollback() {
+				if (!changed) return true;
+				const current = getInput();
+				const fresh = actions.captureInsertion();
+				if (fresh.draftRev !== range.draftRev) {
+					// Edits outside an unchanged owned range need not prevent cancellation.
+					if (!current || current.draftRev !== fresh.draftRev || !Array.isArray(current.occurrences)
+						|| current.occurrences.length > 0 || typeof current.draft !== 'string'
+						|| current.draft.slice(0, range.start) !== input.draft.slice(0, range.start)
+						|| current.draft.slice(range.start, range.end) !== text) return false;
+					range = { ...range, draftRev: fresh.draftRev };
+				}
+				conflict = false;
+				return write(original);
+			} };
 		}
 
 		/** Prefer the entry's injected `transcribe`; fall back to the Remote captured at activation. */
@@ -1767,7 +1783,7 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 
 				const cancel = (silent) => {
 					clearTimeoutOf('liveTimer');
-					state.liveDraft?.rollback();
+					const rolledBack = state.liveDraft?.rollback() !== false;
 					state.liveDraft = null;
 					clearTimer();
 					clearLimit();
@@ -1790,7 +1806,7 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 					state.abort = null;
 					if (capture !== null) capture.dispose();
 					if (silent) show({ phase: 'idle', notice: '', cancelled: false });
-					else show({ phase: 'notice', notice: say('cancelled'), tone: 'muted', cancelled: false });
+					else show({ phase: 'notice', notice: say(rolledBack ? 'cancelled' : 'cancelledEdited'), tone: 'muted', cancelled: false });
 				};
 
 				/**
@@ -1891,7 +1907,7 @@ registerProcessor('dsh-dictation-pcm', DictationPCM);
 					state.preview = null;
 					const provider = runtime.limits?.providers?.find((provider) => provider.id === runtime.limits.selection?.providerId);
 					state.liveDraft = config.get('live') && provider?.location === 'host-local'
-						? createLiveDraft(actions, latest.current.input, state.span) : null;
+						? createLiveDraft(actions, latest.current.input, state.span, () => latest.current.input) : null;
 					state.abort = new AbortController();
 					resetGesture();
 					const capture = createCapture(state.liveDraft !== null);
