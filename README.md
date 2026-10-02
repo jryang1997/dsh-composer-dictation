@@ -7,8 +7,10 @@
 在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的输入框里按住说话，松开后转写到草稿。**不会自动发送。**
 
 <p align="center">
-  <img src="docs/gesture-overview.svg" width="720" alt="操作示意：按住约 0.3 秒，开口说话，松开后文字进入草稿">
+  <img src="docs/dictation-demo.gif" width="960" alt="实际操作录屏：鼠标悬停显示提示，长按开始录音，上滑后松开取消">
 </p>
+
+实操演示：悬停提示 → 长按录音 → 上滑取消。
 
 ## 交给 Agent 安装
 
@@ -54,6 +56,21 @@ dsh plugin --profile <profile> add github:jryang1997/dsh-hold-to-dictate
 - 识别期间修改了草稿，转写文字会保留在小标签中，点击即可插入。
 
 在 **设置 → 插件 → 按住说话** 中，可以调整长按时长、快捷键、悬停提示和动效。
+
+<p align="center">
+  <img src="docs/settings-user.png" width="960" alt="按住说话的设置页面：长按时长、触屏长按时长、动效、悬停提示及键盘快捷键">
+</p>
+
+设置截图来自旧版 v1.5.2；当前版本已修复图中的说明文字，并更新了插件名称和图标。
+
+<details>
+<summary>另一张设置截图</summary>
+
+<p align="center">
+  <img src="docs/settings-user-2.png" width="960" alt="按住说话的另一张设置页面截图，包含全部设置和组件运行状态">
+</p>
+
+</details>
 
 ## 更新或卸载
 

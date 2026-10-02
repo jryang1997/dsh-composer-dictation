@@ -7,8 +7,10 @@
 Hold the mouse button in the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) message box and speak. Release to transcribe into your draft. **Nothing is sent automatically.**
 
 <p align="center">
-  <img src="docs/gesture-overview.svg" width="720" alt="Gesture overview: hold for about 0.3 seconds, speak, then release to transcribe into the draft">
+  <img src="docs/dictation-demo.gif" width="960" alt="Actual screen recording: hover to reveal the hint, hold to record, then swipe up and release to cancel">
 </p>
+
+Actual usage: hover hint → hold to record → swipe up to cancel.
 
 ## Ask your Agent to install
 
@@ -55,6 +57,21 @@ Replace `<profile>` with your profile name. The desktop app manages its `desktop
 - If you edit the draft during recognition, the transcript stays in a small chip. Click it to insert the text.
 
 Under **Settings → Plugins → Hold to talk**, adjust hold duration, keyboard shortcut, hover hint and motion.
+
+<p align="center">
+  <img src="docs/settings-user.png" width="960" alt="Hold to talk settings: mouse and touch hold durations, motion, hover hint and keyboard shortcut">
+</p>
+
+The settings screenshot shows v1.5.2. The current version fixes the description text and updates the plugin name and icon.
+
+<details>
+<summary>Another settings screenshot</summary>
+
+<p align="center">
+  <img src="docs/settings-user-2.png" width="960" alt="Another Hold to talk settings screenshot showing all settings and component status">
+</p>
+
+</details>
 
 ## Update or uninstall
 
